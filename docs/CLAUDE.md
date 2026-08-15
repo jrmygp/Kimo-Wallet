@@ -53,7 +53,9 @@ Ten rules. Violating any of these means the change is rejected regardless of how
    one file per day, new sessions appended at the bottom. Correct an earlier entry by writing a
    new one that says so — never by changing it.
 9. **Never disable, skip, or weaken a test to make a build pass.** Fix the code or report the failure.
-10. **Never claim work is done without running the relevant build/lint/test and pasting real output.**
+10. **Never claim work is done without running the relevant build/lint/test and pasting real
+    output — and for any change that alters the UI, never without seeing it rendered.**
+    A green build is not evidence that a visual change worked. See §5.6.
 
 ---
 
@@ -408,6 +410,89 @@ The form stack is **Formik** for form state and **Yup** for schemas, per
 - Tests must be deterministic — no reliance on wall-clock timing, ordering, or sleeps.
 - Run the tests. Paste real output into the log. Never describe a test result you did not observe.
 
+### 5.6 UI Verification — look at it before you call it done
+
+**A passing build is not evidence that a UI change works.** `tsc`, `eslint` and `next build` check
+that code *compiles*. They cannot see that a style was overridden, a class did nothing, an element
+rendered at zero height, or that the page looks exactly as it did before you touched it. Every
+CSS bug in §5.6.3 below was found in this repo **after** a completely clean build.
+
+This rule exists because "done" was repeatedly reported for changes that did nothing at all. That
+wastes far more time and tokens than verifying would have: the user reports it, the agent
+re-reads the file, re-derives the context, and re-does the work — often several times.
+
+#### 5.6.1 The requirement
+
+If your change touches **anything the user can see** — a component, a class name, a layout, a
+style, a page, a conditional render — you must **observe the rendered result** before reporting
+completion. Not the diff. Not the build log. The rendered UI.
+
+Acceptable evidence, in order of preference:
+
+1. **A screenshot of the actual page** via the browser tools (`claude-in-chrome`), navigated to the
+   affected route, in the state that triggers the change (error state, sheet open, list scrolled).
+2. **A DOM/computed-style read** of the specific element, proving the class landed and resolved —
+   e.g. reading the element's `class` attribute and its computed `border-color` / `height`.
+3. **A reproduction of the resolved CSS** outside the browser when the question is purely one of
+   class merging — e.g. running `cn()` in node to prove which class survives `tailwind-merge`.
+
+Evidence that does **not** count, on its own:
+
+- "`next build` succeeded."
+- "TypeScript and ESLint pass."
+- "The class is present in the file."
+- "This should work" / "this will now render correctly."
+- Any sentence describing an appearance you did not actually look at.
+
+#### 5.6.2 When you cannot verify
+
+Sometimes the browser tooling is unavailable, the extension is not connected, or no dev server is
+reachable. That is a normal situation and there is exactly one correct response:
+
+> **Say so explicitly, in the same message, and do not use the word "done".**
+
+State what you changed, state the mechanism you expect to fix it, state that you could **not**
+visually confirm it, and tell the user precisely what to look at. "I verified the build; I could
+not verify the rendering — please check whether the border is now red on the Number field" is an
+honest, useful report. "Done, the border is now red" — when you never saw it — is not, and it is
+the specific failure this rule forbids.
+
+Never substitute confidence for observation. If you did not see it, do not describe it.
+
+#### 5.6.3 Repo-specific CSS traps (all found here, all build-clean)
+
+Check these before assuming a style will apply. Each one silently does nothing:
+
+1. **Variant specificity beats plain classes.** A built-in `data-[side=bottom]:h-auto` in a shadcn
+   component outranks your `h-[80vh]`, because a class+attribute selector has higher specificity.
+   Override using the *same* variant (`data-[side=bottom]:h-[80vh]`) so `tailwind-merge` recognises
+   the conflict and drops one.
+2. **Percentage heights need a definite-height ancestor.** `h-full` / `min-h-full` resolve against
+   an ancestor's `height`, **not** its `min-height`. A parent with `min-h-screen` gives descendants
+   nothing to resolve against; it must be `h-screen`.
+3. **Border colour without border width paints nothing.** Tailwind preflight sets `border-width: 0`,
+   so `aria-invalid:border-destructive` is invisible unless the base classes also declare a width
+   (`border border-transparent`, the pattern `Button` uses).
+4. **Conflicting shorthand in one string.** `overflow-hidden overflow-x-auto` sets the same property
+   twice; in a raw `className` string (not passed through `cn()`), the winner is decided by
+   stylesheet order, not by your intent.
+5. **Flex children will not shrink by default.** A `flex-1 overflow-y-auto` scroll area also needs
+   `min-h-0`, or `min-height: auto` makes it grow to fit its content and never scroll.
+6. **A `size`/variant prop that TypeScript accepts may have no CSS behind it.** `Avatar` accepted
+   `size="xl"` while the root element had no `data-[size=xl]` rule at all. Types are not styles.
+
+#### 5.6.4 Verifying an interactive change
+
+For anything with state — a sheet, a dropdown, a form error, a scroll container — verifying the
+default render is not enough. Drive it into the state you changed:
+
+- Opened the sheet, and **scrolled the list**?
+- Submitted the form, and **seen the error style** on the invalid field?
+- Actually **scrolled the carousel** horizontally?
+- Checked the state you did *not* change still behaves (no regression)?
+
+A change that only works before you interact with it is not done.
+
 ---
 
 ## 6. Security
@@ -468,7 +553,10 @@ A task is done when **all** of these are true:
 7. **Your entry is appended to `docs/agent-logs/<today>.md`** (one file per day — created if this
    is the day's first session, appended to otherwise, never a second file for the same date, never
    overwriting an earlier entry), **and a line is prepended to `INDEX.md`.**
-8. The user has been told plainly what was done, what was verified, and what was not.
+8. **If the change is visible to the user, you have seen it rendered** — screenshot or computed
+   style, in the state that triggers it (§5.6). If you could not, you said so explicitly and did
+   not call it done.
+9. The user has been told plainly what was done, what was verified, and what was not.
 
 ---
 
@@ -486,6 +574,9 @@ DURING:  money = idempotency key + row lock + double-entry ledger + guarded stat
          one purpose per change, match surrounding style
 
 AFTER:   build + lint + test, paste real output
+         UI change? LOOK AT IT RENDERED — screenshot/computed style, in the state
+           that triggers it. A green build proves nothing visual. Cannot see it?
+           say so and do NOT say "done".
          APPEND '## Entry N' to docs/agent-logs/YYYY-MM-DD.md (one file per day,
            never a second file for today, never touch an existing entry)
          prepend a line to docs/agent-logs/INDEX.md

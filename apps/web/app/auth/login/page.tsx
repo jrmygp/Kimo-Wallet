@@ -9,8 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { useFormik } from "formik";
 import { loginValidation } from "@/features/transaction/schemas/login.schema";
+import { useRouter } from "next/navigation";
 
 const LoginPage = () => {
+  const router = useRouter();
+
   const formik = useFormik({
     initialValues: {
       country: "ID",
@@ -18,7 +21,7 @@ const LoginPage = () => {
     },
     validationSchema: loginValidation,
     onSubmit: (values) => {
-      console.log(values);
+      router.push("/home")
     },
   });
 
@@ -28,7 +31,7 @@ const LoginPage = () => {
   return (
     <Page>
       <form
-        className="bg-kimo-500 flex min-h-full w-full flex-col justify-between py-10 px-4"
+        className="bg-kimo-500 flex min-h-full w-full flex-col justify-between py-10"
         onSubmit={formik.handleSubmit}
       >
         <section className="flex flex-col w-full items-center justify-center gap-4">
@@ -67,7 +70,9 @@ const LoginPage = () => {
 
           <div className="flex items-center gap-2">
             <p className="text-xs text-white">Lost or inactive number?</p>
-            <Button className="rounded-2xl">Change number</Button>
+            <Button className="rounded-2xl" size="sm">
+              Change number
+            </Button>
           </div>
         </section>
 

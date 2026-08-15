@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-08-15 — Entry 4 — [Mandatory UI verification before reporting done](2026-08-15.md) — docs — money:no — completed
 - 2026-08-15 — Entry 3 — [Change log switched to one file per day](2026-08-15.md) — docs — money:no — completed
 - 2026-08-15 — Entry 2 — [Formik + Yup form rules added to ruleset](2026-08-15.md) — docs — money:no — completed
 - 2026-08-15 — Entry 1 — [Agent rules and change-log protocol established](2026-08-15.md) — docs — money:no — completed
