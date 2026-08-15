@@ -530,8 +530,8 @@ Suggested structure:
 apps/web/
 ├── app/
 │   ├── (auth)/
-│   ├── (wallet)/
-│   │   ├── home/
+│   ├── (home)/
+|   |   ├── wallet/ 
 │   │   ├── activity/
 │   │   ├── scan/
 │   │   └── profile/
