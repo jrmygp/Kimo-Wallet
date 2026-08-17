@@ -1,14 +1,43 @@
+"use client";
+
+import { useState } from "react";
 import Page from "@/components/layout/Page";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { MdOutlineQrCode2, MdOutlineViewList, MdOutlineAddCard, MdSend, MdSettings, MdEmail } from "react-icons/md";
+import {
+  MdOutlineQrCode2,
+  MdOutlineViewList,
+  MdOutlineAddCard,
+  MdSend,
+  MdSettings,
+  MdEmail,
+  MdOutlineVisibility,
+  MdOutlineVisibilityOff,
+} from "react-icons/md";
 import image1 from "@/public/images/carousel1.jpeg";
 import image2 from "@/public/images/carousel2.jpeg";
 import image3 from "@/public/images/carousel3.jpeg";
 import Image from "next/image";
 import Link from "next/link";
+import { TransactionRow } from "@/features/transaction/components/transaction-row";
+import type { Transaction } from "@/features/transaction/types";
+
+const menuItemClassName =
+  "flex flex-col items-center gap-1.5 cursor-pointer rounded-md py-3 transition-all duration-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kimo-500";
+
+const iconWrapperClassName =
+  "flex size-11 items-center justify-center rounded-full bg-white text-kimo-500 shadow-sm";
+
+const transactions: Transaction[] = [
+  { id: "1", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
+  { id: "2", counterpartyName: "John Smith", occurredAt: "2026-08-15T13:00:00", amount: 100000, direction: "in" },
+  { id: "3", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
+  { id: "4", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
+  { id: "5", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
+];
 
 const HomePage = () => {
+  const [balanceHidden, setBalanceHidden] = useState(false);
+
   return (
     <Page>
       <div className="flex min-h-full w-full flex-col gap-8 items-center">
@@ -22,154 +51,100 @@ const HomePage = () => {
 
             <div className="flex flex-col">
               <p className="font-bold text-xl text-white">Jhon Doe</p>
-              <p className="text-sm text-white">+6281234567890</p>
+              <p className="text-sm text-white/80">+6281234567890</p>
             </div>
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col items-start sm:items-end">
             <p className="font-bold text-xl text-white text-left sm:text-right">My Balance</p>
-            <p className="text-2xl text-white text-left sm:text-right">Rp 100.000</p>
+            <div className="flex items-center gap-2">
+              <p className="text-2xl text-white text-left sm:text-right tabular-nums">
+                {balanceHidden ? "Rp ••••••" : "Rp 100.000"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setBalanceHidden((hidden) => !hidden)}
+                aria-label={balanceHidden ? "Show balance" : "Hide balance"}
+                aria-pressed={balanceHidden}
+                className="cursor-pointer text-white/80 transition-colors hover:text-white"
+              >
+                {balanceHidden ? <MdOutlineVisibilityOff size={20} /> : <MdOutlineVisibility size={20} />}
+              </button>
+            </div>
           </div>
         </section>
 
         {/* Menus */}
         <section className="bg-white px-4 sm:px-10 flex flex-col w-full">
-          <div className="rounded-md p-4 grid grid-cols-3 gap-y-8 bg-kimo-50">
-            <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
-              <MdOutlineAddCard size={28} className="text-kimo-500" />
-              <p className="text-sm text-center">Top Up</p>
-              <p className="text-xs text-gray-500 text-center">Top up your balance</p>
-            </div>
+          <div className="rounded-md p-4 grid grid-cols-3 gap-y-4 bg-kimo-50">
+            <button type="button" className={menuItemClassName}>
+              <span className={iconWrapperClassName}>
+                <MdOutlineAddCard size={22} />
+              </span>
+              <p className="text-sm text-center font-medium">Top Up</p>
+            </button>
 
-            <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
-              <MdSend size={28} className="text-kimo-500" />
-              <p className="text-sm text-center">Transfer</p>
-              <p className="text-xs text-gray-500 text-center">Send money</p>
-            </div>
+            <button type="button" className={menuItemClassName}>
+              <span className={iconWrapperClassName}>
+                <MdSend size={22} />
+              </span>
+              <p className="text-sm text-center font-medium">Transfer</p>
+            </button>
 
-            <Link className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300" href={"/wallet/qr"}>
-              <MdOutlineQrCode2 size={28} className="text-kimo-500" />
-              <p className="text-sm text-center">QR Code</p>
-              <p className="text-xs text-gray-500 text-center">Generate QR</p>
+            <Link href="/wallet/qr" className={menuItemClassName}>
+              <span className={iconWrapperClassName}>
+                <MdOutlineQrCode2 size={22} />
+              </span>
+              <p className="text-sm text-center font-medium">QR Code</p>
             </Link>
 
-            <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
-              <MdOutlineViewList size={28} className="text-kimo-500" />
-              <p className="text-sm text-center">Transaction History</p>
-              <p className="text-xs text-gray-500 text-center">See your history</p>
-            </div>
+            <Link href="/wallet/history" className={menuItemClassName}>
+              <span className={iconWrapperClassName}>
+                <MdOutlineViewList size={22} />
+              </span>
+              <p className="text-sm text-center font-medium">History</p>
+            </Link>
 
-            <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
-              <MdEmail size={28} className="text-kimo-500" />
-              <p className="text-sm text-center">Inbox</p>
-              <p className="text-xs text-gray-500 text-center">See recent notifications</p>
-            </div>
+            <button type="button" className={menuItemClassName}>
+              <span className={iconWrapperClassName}>
+                <MdEmail size={22} />
+              </span>
+              <p className="text-sm text-center font-medium">Inbox</p>
+            </button>
 
-            <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
-              <MdSettings size={28} className="text-kimo-500" />
-              <p className="text-sm text-center">Settings</p>
-              <p className="text-xs text-gray-500 text-center">Application settings</p>
-            </div>
+            <button type="button" className={menuItemClassName}>
+              <span className={iconWrapperClassName}>
+                <MdSettings size={22} />
+              </span>
+              <p className="text-sm text-center font-medium">Settings</p>
+            </button>
           </div>
         </section>
 
         {/* Promotion carousel */}
-        <section className="flex w-full min-w-0 items-center gap-8 overflow-x-auto px-10">
-          <div className="w-96 shrink-0 rounded-md overflow-hidden shadow-lg">
-            <Image src={image1} alt="image-1" />
+        <section
+          aria-label="Promotions"
+          className="flex w-full min-w-0 snap-x snap-mandatory items-center gap-4 overflow-x-auto px-10 pb-1"
+        >
+          <div className="w-96 shrink-0 snap-center overflow-hidden rounded-md shadow-lg">
+            <Image src={image1} alt="Promotion 1" />
           </div>
-          <div className="w-96 shrink-0 rounded-md overflow-hidden shadow-lg">
-            <Image src={image2} alt="image-2" />
+          <div className="w-96 shrink-0 snap-center overflow-hidden rounded-md shadow-lg">
+            <Image src={image2} alt="Promotion 2" />
           </div>
-          <div className="w-96 shrink-0 rounded-md overflow-hidden shadow-lg">
-            <Image src={image3} alt="image-3" />
+          <div className="w-96 shrink-0 snap-center overflow-hidden rounded-md shadow-lg">
+            <Image src={image3} alt="Promotion 3" />
           </div>
         </section>
 
-        {/* Latest 5 transactions */}
-        <section className="w-full flex flex-col gap-8 px-10 border-t-2 bg-[#F7F7F7] py-4">
-          <p className="font-medium text-left text-[#2C2C2C] text-lg">Latest Transactions</p>
+        {/* Latest transactions */}
+        <section className="w-full flex flex-col gap-6 px-4 sm:px-10 border-t border-border bg-muted/40 py-6">
+          <p className="font-medium text-left text-foreground text-lg">Latest Transactions</p>
 
           <div className="flex flex-col gap-4">
-            <div className="flex items-center sm:w-80 justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar size="lg">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback>CN</AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col">
-                  <p>Jane Doe</p>
-                  <p className="text-xs">15 Aug 2026, 17:20</p>
-                </div>
-              </div>
-
-              <Badge variant="destructive">- Rp 50.000</Badge>
-            </div>
-
-            <div className="flex items-center sm:w-80 justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar size="lg">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback>CN</AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col">
-                  <p>John Smith</p>
-                  <p className="text-xs">15 Aug 2026, 13:00</p>
-                </div>
-              </div>
-
-              <Badge className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">+ Rp 100.000</Badge>
-            </div>
-
-            <div className="flex items-center sm:w-80 justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar size="lg">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback>CN</AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col">
-                  <p>Jane Doe</p>
-                  <p className="text-xs">15 Aug 2026, 17:20</p>
-                </div>
-              </div>
-
-              <Badge variant="destructive">- Rp 50.000</Badge>
-            </div>
-
-            <div className="flex items-center sm:w-80 justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar size="lg">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback>CN</AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col">
-                  <p>Jane Doe</p>
-                  <p className="text-xs">15 Aug 2026, 17:20</p>
-                </div>
-              </div>
-
-              <Badge variant="destructive">- Rp 50.000</Badge>
-            </div>
-
-            <div className="flex items-center sm:w-80 justify-between">
-              <div className="flex items-center gap-2">
-                <Avatar size="lg">
-                  <AvatarImage src="https://github.com/shadcn.png" />
-                  <AvatarFallback>CN</AvatarFallback>
-                </Avatar>
-
-                <div className="flex flex-col">
-                  <p>Jane Doe</p>
-                  <p className="text-xs">15 Aug 2026, 17:20</p>
-                </div>
-              </div>
-
-              <Badge variant="destructive">- Rp 50.000</Badge>
-            </div>
+            {transactions.map((transaction) => (
+              <TransactionRow key={transaction.id} transaction={transaction} />
+            ))}
           </div>
         </section>
       </div>

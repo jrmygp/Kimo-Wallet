@@ -459,9 +459,9 @@ the specific failure this rule forbids.
 
 Never substitute confidence for observation. If you did not see it, do not describe it.
 
-#### 5.6.3 Repo-specific CSS traps (all found here, all build-clean)
+#### 5.6.3 Repo-specific CSS and interaction traps (all found here, all build-clean)
 
-Check these before assuming a style will apply. Each one silently does nothing:
+Check these before assuming a style or an interaction will work. Each one silently does nothing:
 
 1. **Variant specificity beats plain classes.** A built-in `data-[side=bottom]:h-auto` in a shadcn
    component outranks your `h-[80vh]`, because a class+attribute selector has higher specificity.
@@ -480,6 +480,16 @@ Check these before assuming a style will apply. Each one silently does nothing:
    `min-h-0`, or `min-height: auto` makes it grow to fit its content and never scroll.
 6. **A `size`/variant prop that TypeScript accepts may have no CSS behind it.** `Avatar` accepted
    `size="xl"` while the root element had no `data-[size=xl]` rule at all. Types are not styles.
+7. **Flex items also refuse to shrink *below* their declared width by default — the other
+   direction of #5.** A row of fixed-width cards (`w-96`) inside `overflow-x-auto` needs
+   `shrink-0` on each card, or `flex-shrink: 1` squeezes them all to fit instead of overflowing —
+   which looks like "the carousel isn't scrollable" but is actually "there's nothing to scroll to."
+8. **An IntersectionObserver-based infinite-scroll sentinel fires on a *transition* into view, not
+   on "currently intersecting."** A fast or programmatic scroll that lands exactly at the maximum
+   scrollable position in one motion never produces that transition, so the load silently stalls
+   even though more data exists — reproduced with `react-infinite-scroll-component` after 3–6 pages
+   loaded correctly. A plain `scroll` listener on the real scroll container, checked independently
+   of the library's own trigger, is the reliable fix — see `app/wallet/history/page.tsx`.
 
 #### 5.6.4 Verifying an interactive change
 
