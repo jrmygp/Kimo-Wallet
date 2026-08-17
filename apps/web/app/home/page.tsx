@@ -6,6 +6,7 @@ import image1 from "@/public/images/carousel1.jpeg";
 import image2 from "@/public/images/carousel2.jpeg";
 import image3 from "@/public/images/carousel3.jpeg";
 import Image from "next/image";
+import Link from "next/link";
 
 const HomePage = () => {
   return (
@@ -46,11 +47,11 @@ const HomePage = () => {
               <p className="text-xs text-gray-500 text-center">Send money</p>
             </div>
 
-            <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
+            <Link className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300" href={"/wallet/qr"}>
               <MdOutlineQrCode2 size={28} className="text-kimo-500" />
               <p className="text-sm text-center">QR Code</p>
               <p className="text-xs text-gray-500 text-center">Generate QR</p>
-            </div>
+            </Link>
 
             <div className="flex flex-col items-center cursor-pointer hover:bg-white py-4 rounded-md transition-all duration-300">
               <MdOutlineViewList size={28} className="text-kimo-500" />
