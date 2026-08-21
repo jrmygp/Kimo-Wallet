@@ -1,0 +1,19 @@
+# Env files — never commit secrets (docs/CLAUDE.md §1 rule 4)
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# Go build output
+apps/*/bin/
+*.test
+
+# Generated protobuf code — regenerated via `buf generate` (docs/CLAUDE.md §7)
+apps/*/gen/
+
+# OS / editor
+.DS_Store

@@ -31,7 +31,7 @@ const LoginPage = () => {
   return (
     <Page>
       <form
-        className="bg-kimo-500 flex min-h-full w-full flex-col justify-between py-10"
+        className="bg-kimo-500 flex min-h-full w-full flex-col justify-between py-10 px-2 sm:px-0"
         onSubmit={formik.handleSubmit}
       >
         <section className="flex flex-col w-full items-center justify-center gap-4">

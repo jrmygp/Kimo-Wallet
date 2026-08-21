@@ -18,6 +18,10 @@ Rules:
 
 ## Entries
 
+- 2026-08-21 — Entry 4 — [API Gateway (HTTP → gRPC, wraps user-service's Register)](2026-08-21.md) — apps/api-gateway — money:no — completed
+- 2026-08-21 — Entry 3 — [Auto-load .env via joho/godotenv](2026-08-21.md) — apps/user-service — money:no — completed
+- 2026-08-21 — Entry 2 — [Switch user-service persistence from raw pgx to GORM](2026-08-21.md) — apps/user-service — money:no — completed
+- 2026-08-21 — Entry 1 — [user-service bootstrap + Register (phone + full name only)](2026-08-21.md) — apps/user-service, packages/contracts — money:no — completed
 - 2026-08-17 — Entry 1 — [Transaction History page with verified infinite scroll](2026-08-17.md) — apps/web — money:no — completed
 - 2026-08-15 — Entry 4 — [Mandatory UI verification before reporting done](2026-08-15.md) — docs — money:no — completed
 - 2026-08-15 — Entry 3 — [Change log switched to one file per day](2026-08-15.md) — docs — money:no — completed
