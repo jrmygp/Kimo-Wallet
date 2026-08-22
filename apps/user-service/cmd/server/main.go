@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 
+	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/authtoken"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/config"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/grpcserver"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/service"
@@ -69,7 +70,8 @@ func run(logger *slog.Logger) error {
 	logger.Info("migrations applied")
 
 	repo := postgres.NewUserRepository(db)
-	userService := service.NewUserService(repo)
+	minter := authtoken.NewMinter(cfg.JWTSecret)
+	userService := service.NewUserService(repo, minter)
 	userServer := grpcserver.NewUserServer(userService)
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)

@@ -23,6 +23,11 @@ type stubUserServiceClient struct {
 	registerErr  error
 	loginResp    *userv1.LoginResponse
 	loginErr     error
+	getUserResp  *userv1.GetUserByIDResponse
+	getUserErr   error
+	// gotGetUserID records the id GetUserByID was actually called with, so
+	// tests can assert the route param made it into the gRPC request.
+	gotGetUserID *string
 }
 
 func (s stubUserServiceClient) Register(ctx context.Context, in *userv1.RegisterRequest, opts ...grpc.CallOption) (*userv1.RegisterResponse, error) {
@@ -31,6 +36,13 @@ func (s stubUserServiceClient) Register(ctx context.Context, in *userv1.Register
 
 func (s stubUserServiceClient) Login(ctx context.Context, in *userv1.LoginRequest, opts ...grpc.CallOption) (*userv1.LoginResponse, error) {
 	return s.loginResp, s.loginErr
+}
+
+func (s stubUserServiceClient) GetUserByID(ctx context.Context, in *userv1.GetUserByIDRequest, opts ...grpc.CallOption) (*userv1.GetUserByIDResponse, error) {
+	if s.gotGetUserID != nil {
+		*s.gotGetUserID = in.GetId()
+	}
+	return s.getUserResp, s.getUserErr
 }
 
 // errorEnvelope decodes an apiResponse where data is expected to be null.
@@ -73,6 +85,7 @@ func TestUserHandler_Register(t *testing.T) {
 					FullName:    "Jane Doe",
 					CreatedAt:   timestamppb.New(fixedTime),
 				},
+				AccessToken: "signed.jwt.token",
 			}},
 			wantStatus:    http.StatusCreated,
 			wantBodyPhone: "+6281234567890",
@@ -159,6 +172,9 @@ func TestUserHandler_Register(t *testing.T) {
 			if env.Data.User.CreatedAt != fixedTime.Format(time.RFC3339) {
 				t.Fatalf("got createdAt %q, want %q", env.Data.User.CreatedAt, fixedTime.Format(time.RFC3339))
 			}
+			if env.Data.AccessToken != "signed.jwt.token" {
+				t.Fatalf("got accessToken %q, want %q", env.Data.AccessToken, "signed.jwt.token")
+			}
 		})
 	}
 }
@@ -200,6 +216,7 @@ func TestUserHandler_Login(t *testing.T) {
 					FullName:    "Jane Doe",
 					CreatedAt:   timestamppb.New(fixedTime),
 				},
+				AccessToken: "signed.jwt.token",
 			}},
 			wantStatus:    http.StatusOK,
 			wantBodyPhone: "+6281234567890",
@@ -278,6 +295,93 @@ func TestUserHandler_Login(t *testing.T) {
 			}
 			if env.Data.User.CreatedAt != fixedTime.Format(time.RFC3339) {
 				t.Fatalf("got createdAt %q, want %q", env.Data.User.CreatedAt, fixedTime.Format(time.RFC3339))
+			}
+			if env.Data.AccessToken != "signed.jwt.token" {
+				t.Fatalf("got accessToken %q, want %q", env.Data.AccessToken, "signed.jwt.token")
+			}
+		})
+	}
+}
+
+func TestUserHandler_GetUserByID(t *testing.T) {
+	fixedTime := time.Date(2026, 8, 21, 12, 0, 0, 0, time.UTC)
+	const wantID = "11111111-1111-4111-8111-111111111111"
+
+	tests := []struct {
+		name           string
+		stub           stubUserServiceClient
+		wantStatus     int
+		wantErrPresent bool
+	}{
+		{
+			name: "success returns 200 with the requested user",
+			stub: stubUserServiceClient{getUserResp: &userv1.GetUserByIDResponse{
+				User: &userv1.User{
+					Id:          wantID,
+					PhoneNumber: "+6281234567890",
+					FullName:    "Jane Doe",
+					CreatedAt:   timestamppb.New(fixedTime),
+				},
+			}},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:           "NotFound from user-service maps to 404",
+			stub:           stubUserServiceClient{getUserErr: status.Error(codes.NotFound, "user not found")},
+			wantStatus:     http.StatusNotFound,
+			wantErrPresent: true,
+		},
+		{
+			name:           "Internal error from user-service maps to 500 without leaking detail",
+			stub:           stubUserServiceClient{getUserErr: status.Error(codes.Internal, "failed to find user")},
+			wantStatus:     http.StatusInternalServerError,
+			wantErrPresent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotID string
+			tt.stub.gotGetUserID = &gotID
+			h := NewUserHandler(tt.stub)
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/users/"+wantID, nil)
+			req.SetPathValue("id", wantID)
+			rec := httptest.NewRecorder()
+
+			h.GetUserByID(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d (body: %s)", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if gotID != wantID {
+				t.Fatalf("GetUserByID called with id %q, want %q — route param not wired through", gotID, wantID)
+			}
+
+			if tt.wantErrPresent {
+				var env errorEnvelope
+				if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+					t.Fatalf("decode error envelope: %v", err)
+				}
+				if env.Data != nil {
+					t.Fatalf("expected data to be null on error, got %v", env.Data)
+				}
+				return
+			}
+
+			var env struct {
+				StatusCode int              `json:"statusCode"`
+				Message    string           `json:"message"`
+				Data       userResponseBody `json:"data"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+				t.Fatalf("decode success envelope: %v", err)
+			}
+			if env.Data.ID != wantID {
+				t.Fatalf("got id %q, want %q", env.Data.ID, wantID)
+			}
+			if env.Data.FullName != "Jane Doe" {
+				t.Fatalf("got fullName %q, want %q", env.Data.FullName, "Jane Doe")
 			}
 		})
 	}

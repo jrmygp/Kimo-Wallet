@@ -27,6 +27,7 @@ const maxRequestBodyBytes = 1 << 20 // 1MiB
 type userServiceClient interface {
 	Register(ctx context.Context, in *userv1.RegisterRequest, opts ...grpc.CallOption) (*userv1.RegisterResponse, error)
 	Login(ctx context.Context, in *userv1.LoginRequest, opts ...grpc.CallOption) (*userv1.LoginResponse, error)
+	GetUserByID(ctx context.Context, in *userv1.GetUserByIDRequest, opts ...grpc.CallOption) (*userv1.GetUserByIDResponse, error)
 }
 
 type UserHandler struct {
@@ -50,7 +51,8 @@ type userResponseBody struct {
 }
 
 type registerData struct {
-	User userResponseBody `json:"user"`
+	User        userResponseBody `json:"user"`
+	AccessToken string           `json:"accessToken"`
 }
 
 type loginRequestBody struct {
@@ -58,6 +60,11 @@ type loginRequestBody struct {
 }
 
 type loginData struct {
+	User        userResponseBody `json:"user"`
+	AccessToken string           `json:"accessToken"`
+}
+
+type userData struct {
 	User userResponseBody `json:"user"`
 }
 
@@ -89,6 +96,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 			FullName:    resp.GetUser().GetFullName(),
 			CreatedAt:   resp.GetUser().GetCreatedAt().AsTime().Format(time.RFC3339),
 		},
+		AccessToken: resp.GetAccessToken(),
 	})
 }
 
@@ -114,6 +122,33 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, "login successful", loginData{
+		User: userResponseBody{
+			ID:          resp.GetUser().GetId(),
+			PhoneNumber: resp.GetUser().GetPhoneNumber(),
+			FullName:    resp.GetUser().GetFullName(),
+			CreatedAt:   resp.GetUser().GetCreatedAt().AsTime().Format(time.RFC3339),
+		},
+		AccessToken: resp.GetAccessToken(),
+	})
+}
+
+func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	// How do i retrieve the id from route param?
+	id := r.PathValue("id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "ID is invalid")
+		return
+	}
+
+	resp, err := h.client.GetUserByID(r.Context(), &userv1.GetUserByIDRequest{
+		Id: id,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, "ok", userData{
 		User: userResponseBody{
 			ID:          resp.GetUser().GetId(),
 			PhoneNumber: resp.GetUser().GetPhoneNumber(),

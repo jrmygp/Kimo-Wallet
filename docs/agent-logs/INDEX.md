@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-08-22 — Entry 3 — [JWT access tokens + api-gateway auth middleware](2026-08-22.md) — apps/user-service, apps/api-gateway — money:no — completed
 - 2026-08-22 — Entry 2 — [Standardised response envelope: {statusCode, message, data}](2026-08-22.md) — apps/api-gateway — money:no — completed
 - 2026-08-22 — Entry 1 — [Fix Login: unimplemented RPC + two repository bugs](2026-08-22.md) — apps/user-service — money:no — completed
 - 2026-08-21 — Entry 4 — [API Gateway (HTTP → gRPC, wraps user-service's Register)](2026-08-21.md) — apps/api-gateway — money:no — completed

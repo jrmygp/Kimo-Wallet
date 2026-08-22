@@ -22,6 +22,8 @@ message RegisterRequest {
 
 message RegisterResponse {
   User user = 1;
+  // Short-lived JWT access token for the newly registered user.
+  string access_token = 2;
 }
 
 message LoginRequest {
@@ -29,6 +31,16 @@ message LoginRequest {
 }
 
 message LoginResponse {
+  User user = 1;
+  // Short-lived JWT access token for the authenticated user.
+  string access_token = 2;
+}
+
+message GetUserByIDRequest {
+  string id = 1;
+}
+
+message GetUserByIDResponse {
   User user = 1;
 }
 
@@ -39,4 +51,5 @@ service UserService {
   // Fails with ALREADY_EXISTS if the phone number is already registered.
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
+  rpc GetUserByID(GetUserByIDRequest) returns (GetUserByIDResponse);
 }

@@ -14,18 +14,23 @@ import (
 )
 
 type stubUserService struct {
-	user User
-	err  error
+	user  User
+	token string
+	err   error
 }
 
 // User mirrors domain.User to avoid importing it twice in the stub's field type.
 type User = domain.User
 
-func (s stubUserService) Register(ctx context.Context, phoneNumber, fullName string) (domain.User, error) {
-	return s.user, s.err
+func (s stubUserService) Register(ctx context.Context, phoneNumber, fullName string) (domain.User, string, error) {
+	return s.user, s.token, s.err
 }
 
-func (s stubUserService) Login(ctx context.Context, phoneNumber string) (domain.User, error) {
+func (s stubUserService) Login(ctx context.Context, phoneNumber string) (domain.User, string, error) {
+	return s.user, s.token, s.err
+}
+
+func (s stubUserService) GetUserByID(ctx context.Context, id string) (domain.User, error) {
 	return s.user, s.err
 }
 
@@ -37,12 +42,15 @@ func TestUserServer_Register(t *testing.T) {
 	}{
 		{
 			name: "success returns the created user",
-			stub: stubUserService{user: domain.User{
-				ID:          "11111111-1111-4111-8111-111111111111",
-				PhoneNumber: "+6281234567890",
-				FullName:    "Jane Doe",
-				CreatedAt:   time.Unix(0, 0),
-			}},
+			stub: stubUserService{
+				user: domain.User{
+					ID:          "11111111-1111-4111-8111-111111111111",
+					PhoneNumber: "+6281234567890",
+					FullName:    "Jane Doe",
+					CreatedAt:   time.Unix(0, 0),
+				},
+				token: "signed.jwt.token",
+			},
 			wantCode: codes.OK,
 		},
 		{
@@ -83,6 +91,9 @@ func TestUserServer_Register(t *testing.T) {
 				if resp.GetUser().GetId() != tt.stub.user.ID {
 					t.Fatalf("got user id %q, want %q", resp.GetUser().GetId(), tt.stub.user.ID)
 				}
+				if resp.GetAccessToken() != tt.stub.token {
+					t.Fatalf("got access token %q, want %q", resp.GetAccessToken(), tt.stub.token)
+				}
 				return
 			}
 
@@ -107,12 +118,15 @@ func TestUserServer_Login(t *testing.T) {
 	}{
 		{
 			name: "success returns the matched user",
-			stub: stubUserService{user: domain.User{
-				ID:          "11111111-1111-4111-8111-111111111111",
-				PhoneNumber: "+6281234567890",
-				FullName:    "Jane Doe",
-				CreatedAt:   time.Unix(0, 0),
-			}},
+			stub: stubUserService{
+				user: domain.User{
+					ID:          "11111111-1111-4111-8111-111111111111",
+					PhoneNumber: "+6281234567890",
+					FullName:    "Jane Doe",
+					CreatedAt:   time.Unix(0, 0),
+				},
+				token: "signed.jwt.token",
+			},
 			wantCode: codes.OK,
 		},
 		{
@@ -146,6 +160,9 @@ func TestUserServer_Login(t *testing.T) {
 				}
 				if resp.GetUser().GetId() != tt.stub.user.ID {
 					t.Fatalf("got user id %q, want %q", resp.GetUser().GetId(), tt.stub.user.ID)
+				}
+				if resp.GetAccessToken() != tt.stub.token {
+					t.Fatalf("got access token %q, want %q", resp.GetAccessToken(), tt.stub.token)
 				}
 				return
 			}

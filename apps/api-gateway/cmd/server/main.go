@@ -19,6 +19,8 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/config"
 	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/handler"
 	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/httpserver"
+	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/jwtauth"
+	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/middleware"
 
 	userv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/user/v1"
 )
@@ -63,7 +65,8 @@ func run(logger *slog.Logger) error {
 
 	userClient := userv1.NewUserServiceClient(userServiceConn)
 	userHandler := handler.NewUserHandler(userClient)
-	router := httpserver.NewRouter(userHandler)
+	tokenVerifier := jwtauth.NewVerifier(cfg.JWTSecret)
+	router := httpserver.NewRouter(userHandler, middleware.RequireAuth(tokenVerifier))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,

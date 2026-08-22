@@ -1,35 +1,20 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/httpresponse"
 )
 
-// apiResponse is the one JSON envelope every response from this gateway
-// uses — success or error. `data` is always present (explicit `null` on
-// error, never an omitted key) so a client can rely on the shape without
-// checking which branch it got.
-type apiResponse struct {
-	StatusCode int    `json:"statusCode"`
-	Message    string `json:"message"`
-	Data       any    `json:"data"`
-}
-
 func writeJSON(w http.ResponseWriter, statusCode int, message string, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(apiResponse{
-		StatusCode: statusCode,
-		Message:    message,
-		Data:       data,
-	})
+	httpresponse.WriteJSON(w, statusCode, message, data)
 }
 
 func writeError(w http.ResponseWriter, statusCode int, message string) {
-	writeJSON(w, statusCode, message, nil)
+	httpresponse.WriteError(w, statusCode, message)
 }
 
 // writeGRPCError translates an error returned by an internal gRPC service

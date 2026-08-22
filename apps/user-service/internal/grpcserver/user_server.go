@@ -16,8 +16,9 @@ import (
 
 // userService is the subset of service.UserService this server depends on.
 type userService interface {
-	Register(ctx context.Context, phoneNumber, fullName string) (domain.User, error)
-	Login(ctx context.Context, phoneNumber string) (domain.User, error)
+	Register(ctx context.Context, phoneNumber, fullName string) (domain.User, string, error)
+	Login(ctx context.Context, phoneNumber string) (domain.User, string, error)
+	GetUserByID(ctx context.Context, id string) (domain.User, error)
 }
 
 type UserServer struct {
@@ -30,7 +31,7 @@ func NewUserServer(service userService) *UserServer {
 }
 
 func (s *UserServer) Register(ctx context.Context, req *userv1.RegisterRequest) (*userv1.RegisterResponse, error) {
-	user, err := s.service.Register(ctx, req.GetPhoneNumber(), req.GetFullName())
+	user, token, err := s.service.Register(ctx, req.GetPhoneNumber(), req.GetFullName())
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidPhoneNumber), errors.Is(err, domain.ErrInvalidFullName):
@@ -49,11 +50,12 @@ func (s *UserServer) Register(ctx context.Context, req *userv1.RegisterRequest) 
 			FullName:    user.FullName,
 			CreatedAt:   timestamppb.New(user.CreatedAt),
 		},
+		AccessToken: token,
 	}, nil
 }
 
 func (s *UserServer) Login(ctx context.Context, req *userv1.LoginRequest) (*userv1.LoginResponse, error) {
-	user, err := s.service.Login(ctx, req.GetPhoneNumber())
+	user, token, err := s.service.Login(ctx, req.GetPhoneNumber())
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidPhoneNumber):
@@ -66,6 +68,23 @@ func (s *UserServer) Login(ctx context.Context, req *userv1.LoginRequest) (*user
 	}
 
 	return &userv1.LoginResponse{
+		User: &userv1.User{
+			Id:          user.ID,
+			PhoneNumber: user.PhoneNumber,
+			FullName:    user.FullName,
+			CreatedAt:   timestamppb.New(user.CreatedAt),
+		},
+		AccessToken: token,
+	}, nil
+}
+
+func (s *UserServer) GetUserByID(ctx context.Context, req *userv1.GetUserByIDRequest) (*userv1.GetUserByIDResponse, error) {
+	user, err := s.service.GetUserByID(ctx, req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to find user")
+	}
+
+	return &userv1.GetUserByIDResponse{
 		User: &userv1.User{
 			Id:          user.ID,
 			PhoneNumber: user.PhoneNumber,
