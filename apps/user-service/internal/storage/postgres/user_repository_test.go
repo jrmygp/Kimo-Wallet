@@ -137,3 +137,34 @@ func TestUserRepository_Create_ConcurrentSamePhoneNumber(t *testing.T) {
 		t.Fatalf("got %d rows for phone number, want 1", rowCount)
 	}
 }
+
+func TestUserRepository_Login(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	created, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111",
+		domain.RegisterInput{PhoneNumber: "+6281234567890", FullName: "Jane Doe"})
+	if err != nil {
+		t.Fatalf("Create() error = %v, want nil", err)
+	}
+
+	user, err := repo.Login(ctx, domain.LoginInput{PhoneNumber: "+6281234567890"})
+	if err != nil {
+		t.Fatalf("Login() error = %v, want nil", err)
+	}
+	if user.ID != created.ID || user.PhoneNumber != created.PhoneNumber || user.FullName != created.FullName {
+		t.Fatalf("Login() returned %+v, want %+v", user, created)
+	}
+}
+
+func TestUserRepository_Login_UnknownPhoneNumber(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	_, err := repo.Login(ctx, domain.LoginInput{PhoneNumber: "+6281234567890"})
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Fatalf("Login() error = %v, want %v", err, domain.ErrUserNotFound)
+	}
+}

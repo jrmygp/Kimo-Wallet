@@ -24,10 +24,19 @@ message RegisterResponse {
   User user = 1;
 }
 
+message LoginRequest {
+  string phone_number = 1;
+}
+
+message LoginResponse {
+  User user = 1;
+}
+
 // UserService owns user identity and profile data.
 // It is the source of truth for "does this user exist".
 service UserService {
   // Register creates a new user identity from a phone number and full name.
   // Fails with ALREADY_EXISTS if the phone number is already registered.
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
 }

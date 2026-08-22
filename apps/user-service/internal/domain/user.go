@@ -12,6 +12,7 @@ var (
 	ErrInvalidPhoneNumber = errors.New("phone number must be in E.164 format, e.g. +6281234567890")
 	ErrInvalidFullName    = errors.New("full name must be between 1 and 100 characters")
 	ErrPhoneNumberTaken   = errors.New("phone number is already registered")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 // phoneNumberPattern matches E.164: a leading '+', a non-zero first digit,
@@ -34,6 +35,10 @@ type RegisterInput struct {
 	FullName    string
 }
 
+type LoginInput struct {
+	PhoneNumber string
+}
+
 // NewRegisterInput validates raw registration fields and returns a RegisterInput,
 // or the first validation error encountered. Validation here is a UX/shape check;
 // it is not the authority on whether the phone number is already taken.
@@ -50,4 +55,13 @@ func NewRegisterInput(phoneNumber, fullName string) (RegisterInput, error) {
 	}
 
 	return RegisterInput{PhoneNumber: phoneNumber, FullName: fullName}, nil
+}
+
+func NewLoginInput(phoneNumber string) (LoginInput, error) {
+	phoneNumber = strings.TrimSpace(phoneNumber)
+	if !phoneNumberPattern.MatchString(phoneNumber) {
+		return LoginInput{}, ErrInvalidPhoneNumber
+	}
+
+	return LoginInput{PhoneNumber: phoneNumber}, nil
 }

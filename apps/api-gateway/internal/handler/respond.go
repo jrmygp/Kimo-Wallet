@@ -8,18 +8,28 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type errorResponseBody struct {
-	Error string `json:"error"`
+// apiResponse is the one JSON envelope every response from this gateway
+// uses — success or error. `data` is always present (explicit `null` on
+// error, never an omitted key) so a client can rely on the shape without
+// checking which branch it got.
+type apiResponse struct {
+	StatusCode int    `json:"statusCode"`
+	Message    string `json:"message"`
+	Data       any    `json:"data"`
 }
 
-func writeJSON(w http.ResponseWriter, statusCode int, body any) {
+func writeJSON(w http.ResponseWriter, statusCode int, message string, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(body)
+	_ = json.NewEncoder(w).Encode(apiResponse{
+		StatusCode: statusCode,
+		Message:    message,
+		Data:       data,
+	})
 }
 
 func writeError(w http.ResponseWriter, statusCode int, message string) {
-	writeJSON(w, statusCode, errorResponseBody{Error: message})
+	writeJSON(w, statusCode, message, nil)
 }
 
 // writeGRPCError translates an error returned by an internal gRPC service

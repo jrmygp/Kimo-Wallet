@@ -62,3 +62,21 @@ func (r *UserRepository) Create(ctx context.Context, id string, input domain.Reg
 		CreatedAt:   row.CreatedAt,
 	}, nil
 }
+
+func (r *UserRepository) Login(ctx context.Context, input domain.LoginInput) (domain.User, error) {
+	var row userModel
+
+	if err := r.db.WithContext(ctx).Where("phone_number = ?", input.PhoneNumber).First(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return domain.User{}, domain.ErrUserNotFound
+		}
+		return domain.User{}, fmt.Errorf("find user by phone number: %w", err)
+	}
+
+	return domain.User{
+		ID:          row.ID,
+		PhoneNumber: row.PhoneNumber,
+		FullName:    row.FullName,
+		CreatedAt:   row.CreatedAt,
+	}, nil
+}

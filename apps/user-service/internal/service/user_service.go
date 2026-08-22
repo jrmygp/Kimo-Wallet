@@ -12,6 +12,7 @@ import (
 // UserRepository persists User records.
 type UserRepository interface {
 	Create(ctx context.Context, id string, input domain.RegisterInput) (domain.User, error)
+	Login(ctx context.Context, input domain.LoginInput) (domain.User, error)
 }
 
 type UserService struct {
@@ -37,6 +38,20 @@ func (s *UserService) Register(ctx context.Context, phoneNumber, fullName string
 	}
 
 	user, err := s.repo.Create(ctx, id, input)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	return user, nil
+}
+
+func (s *UserService) Login(ctx context.Context, phoneNumber string) (domain.User, error) {
+	input, err := domain.NewLoginInput(phoneNumber)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	user, err := s.repo.Login(ctx, input)
 	if err != nil {
 		return domain.User{}, err
 	}

@@ -21,18 +21,19 @@ import (
 // not a business rule.
 const maxRequestBodyBytes = 1 << 20 // 1MiB
 
-// userRegisterer is the subset of userv1.UserServiceClient this handler
+// userServiceClient is the subset of userv1.UserServiceClient this handler
 // depends on, so it can be exercised in tests with a stub instead of a
 // real gRPC connection.
-type userRegisterer interface {
+type userServiceClient interface {
 	Register(ctx context.Context, in *userv1.RegisterRequest, opts ...grpc.CallOption) (*userv1.RegisterResponse, error)
+	Login(ctx context.Context, in *userv1.LoginRequest, opts ...grpc.CallOption) (*userv1.LoginResponse, error)
 }
 
 type UserHandler struct {
-	client userRegisterer
+	client userServiceClient
 }
 
-func NewUserHandler(client userRegisterer) *UserHandler {
+func NewUserHandler(client userServiceClient) *UserHandler {
 	return &UserHandler{client: client}
 }
 
@@ -48,7 +49,15 @@ type userResponseBody struct {
 	CreatedAt   string `json:"createdAt"`
 }
 
-type registerResponseBody struct {
+type registerData struct {
+	User userResponseBody `json:"user"`
+}
+
+type loginRequestBody struct {
+	PhoneNumber string `json:"phoneNumber"`
+}
+
+type loginData struct {
 	User userResponseBody `json:"user"`
 }
 
@@ -73,7 +82,38 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, registerResponseBody{
+	writeJSON(w, http.StatusCreated, "user registered successfully", registerData{
+		User: userResponseBody{
+			ID:          resp.GetUser().GetId(),
+			PhoneNumber: resp.GetUser().GetPhoneNumber(),
+			FullName:    resp.GetUser().GetFullName(),
+			CreatedAt:   resp.GetUser().GetCreatedAt().AsTime().Format(time.RFC3339),
+		},
+	})
+}
+
+// Login handles POST /v1/auth/login. Same shape as Register: decode,
+// delegate, translate — no business logic (§4) belongs here. Whether the
+// phone number is well-formed or actually exists is user-service's call,
+// surfaced back to the client via writeGRPCError.
+func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+
+	var body loginRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	resp, err := h.client.Login(r.Context(), &userv1.LoginRequest{
+		PhoneNumber: body.PhoneNumber,
+	})
+	if err != nil {
+		writeGRPCError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, "login successful", loginData{
 		User: userResponseBody{
 			ID:          resp.GetUser().GetId(),
 			PhoneNumber: resp.GetUser().GetPhoneNumber(),
