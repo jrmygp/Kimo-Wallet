@@ -18,6 +18,9 @@ Rules:
 
 ## Entries
 
+- 2026-08-23 — Entry 3 — [Codify GORM as the mandatory ORM for all Go services](2026-08-23.md) — docs — money:no — completed
+- 2026-08-23 — Entry 2 — [Redux + redux-persist for logged-in user data](2026-08-23.md) — apps/web — money:no — completed
+- 2026-08-23 — Entry 1 — [Wire login page to login endpoint; fix real CORS gap; add TanStack Query](2026-08-23.md) — apps/web, apps/api-gateway — money:no — completed
 - 2026-08-22 — Entry 3 — [JWT access tokens + api-gateway auth middleware](2026-08-22.md) — apps/user-service, apps/api-gateway — money:no — completed
 - 2026-08-22 — Entry 2 — [Standardised response envelope: {statusCode, message, data}](2026-08-22.md) — apps/api-gateway — money:no — completed
 - 2026-08-22 — Entry 1 — [Fix Login: unimplemented RPC + two repository bugs](2026-08-22.md) — apps/user-service — money:no — completed

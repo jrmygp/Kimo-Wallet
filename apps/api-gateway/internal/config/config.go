@@ -7,9 +7,10 @@ import (
 )
 
 type Config struct {
-	HTTPPort        string
-	UserServiceAddr string
-	JWTSecret       []byte
+	HTTPPort          string
+	UserServiceAddr   string
+	JWTSecret         []byte
+	CORSAllowedOrigin string
 }
 
 // Load reads configuration from environment variables, failing fast if a
@@ -31,9 +32,15 @@ func Load() (Config, error) {
 		httpPort = "8080"
 	}
 
+	corsAllowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+	if corsAllowedOrigin == "" {
+		corsAllowedOrigin = "http://localhost:3000"
+	}
+
 	return Config{
-		HTTPPort:        httpPort,
-		UserServiceAddr: userServiceAddr,
-		JWTSecret:       []byte(jwtSecret),
+		HTTPPort:          httpPort,
+		UserServiceAddr:   userServiceAddr,
+		JWTSecret:         []byte(jwtSecret),
+		CORSAllowedOrigin: corsAllowedOrigin,
 	}, nil
 }

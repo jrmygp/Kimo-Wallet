@@ -20,12 +20,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { TransactionRow } from "@/features/transaction/components/transaction-row";
 import type { Transaction } from "@/features/transaction/types";
+import { useAppSelector } from "@/lib/store/hooks";
 
 const menuItemClassName =
   "flex flex-col items-center gap-1.5 cursor-pointer rounded-md py-3 transition-all duration-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kimo-500";
 
-const iconWrapperClassName =
-  "flex size-11 items-center justify-center rounded-full bg-white text-kimo-500 shadow-sm";
+const iconWrapperClassName = "flex size-11 items-center justify-center rounded-full bg-white text-kimo-500 shadow-sm";
 
 const transactions: Transaction[] = [
   { id: "1", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
@@ -34,9 +34,10 @@ const transactions: Transaction[] = [
   { id: "4", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
   { id: "5", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
 ];
-
 const HomePage = () => {
   const [balanceHidden, setBalanceHidden] = useState(false);
+  const userData = useAppSelector((state) => state.user);
+  console.log(userData.user)
 
   return (
     <Page>

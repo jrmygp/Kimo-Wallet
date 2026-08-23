@@ -387,6 +387,26 @@ The form stack is **Formik** for form state and **Yup** for schemas, per
 ### 5.4 Backend (Go services)
 
 - Standard layout per the architecture doc: `cmd/`, `internal/`, `migrations/`, `gen/`.
+- **GORM is the mandatory ORM for every Go service — no exceptions.** Do not reach for
+  raw `database/sql`/`pgx` queries, a second ORM (sqlx, ent, sqlc, etc.), or a hand-rolled
+  query builder. If GORM genuinely can't do something a service needs, say so and stop —
+  do not silently reach for a second data-access library. `user-service` is the reference
+  implementation (`internal/storage/postgres/`).
+  - **Never use GORM's `AutoMigrate`.** Schema changes are explicit, forward-only SQL
+    files under `migrations/`, applied by the service's own migration runner at startup —
+    never inferred from Go struct tags at runtime. `AutoMigrate` lets a real database get
+    altered with no reviewable diff, which is exactly what the forward-only-migrations
+    rule below exists to prevent.
+  - Open the connection with `TranslateError: true` so driver-specific errors (e.g. a
+    unique-constraint violation) unwrap cleanly via `errors.As` into a typed driver error
+    (e.g. `*pgconn.PgError`), instead of surfacing as an opaque `database/sql` error.
+  - GORM's default logger writes plain-text lines straight to stdout and can mislabel an
+    expected outcome (e.g. a duplicate-key conflict) as an "ERROR". Silence it
+    (`logger.Default.LogMode(logger.Silent)`) and rely on the service's own structured
+    `slog` logging instead — otherwise it bypasses the structured-JSON-logs rule below.
+  - Keep GORM row-mapping structs (the ones carrying `gorm:"..."` tags) separate from a
+    service's domain types. Domain types stay ORM-tag-free; the storage layer maps
+    between the two.
 - `context.Context` is the first parameter on anything doing I/O, and it is actually honoured
   (timeouts, cancellation) — not accepted and ignored.
 - Wrap errors with `fmt.Errorf("...: %w", err)`. Use typed/sentinel errors at domain boundaries so
@@ -580,6 +600,7 @@ BEFORE:  read this file → read docs/agent-logs/INDEX.md → read today's day f
 DURING:  money = idempotency key + row lock + double-entry ledger + guarded state transition
          integers only, never floats
          forms = Formik + Yup only; schema per form; key lives outside form state
+         Go services = GORM only, never AutoMigrate — migrations are explicit SQL files
          services own their data, contracts come from .proto
          one purpose per change, match surrounding style
 

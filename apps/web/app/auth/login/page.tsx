@@ -1,5 +1,6 @@
 "use client";
 
+import { all } from "country-codes-list";
 import kimo from "@/public/images/kimo.png";
 import Image from "next/image";
 import Page from "@/components/layout/Page";
@@ -8,11 +9,18 @@ import { CountryCodeSelect } from "@/components/country-code-select";
 import { Input } from "@/components/ui/input";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { useFormik } from "formik";
-import { loginValidation } from "@/features/transaction/schemas/login.schema";
+import { loginValidation } from "@/features/auth/schemas/login.schema";
+import { useLoginMutation } from "@/features/auth/hooks/use-login-mutation";
 import { useRouter } from "next/navigation";
+import { useAppDispatch } from "@/lib/store/hooks";
+import { setUser } from "@/features/auth/store/user-slice";
+
+const countries = all();
 
 const LoginPage = () => {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const loginMutation = useLoginMutation();
 
   const formik = useFormik({
     initialValues: {
@@ -21,7 +29,21 @@ const LoginPage = () => {
     },
     validationSchema: loginValidation,
     onSubmit: (values) => {
-      router.push("/home")
+      // CountryCodeSelect only ever sets `country` to a code present in
+      // this same `countries` list, so a missing calling code here can't
+      // actually happen through the UI — guarded anyway rather than
+      // building a phone number with a literal "undefined" in it.
+      const callingCode = countries.find((country) => country.countryCode === values.country)?.countryCallingCode;
+      if (!callingCode) return;
+      const phoneNumber = `+${callingCode}${values.number}`;
+
+      loginMutation.mutate(phoneNumber, {
+        onSuccess: (data) => {
+          localStorage.setItem("token", data.accessToken);
+          dispatch(setUser(data.user));
+          router.push("/home");
+        },
+      });
     },
   });
 
@@ -74,12 +96,18 @@ const LoginPage = () => {
               Change number
             </Button>
           </div>
+
+          {loginMutation.isError && (
+            <p role="alert" className="text-sm text-red-200 text-center max-w-sm">
+              {loginMutation.error.message}
+            </p>
+          )}
         </section>
 
         <section className="flex flex-col gap-2 items-center justify-center">
           <p className="text-white text-sm text-center">By continuing, you are agree with our T&C and Privacy Notice</p>
-          <Button className="sm:w-32 w-full" type="submit">
-            Continue
+          <Button className="sm:w-32 w-full" type="submit" disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? "Please wait..." : "Continue"}
           </Button>
         </section>
       </form>

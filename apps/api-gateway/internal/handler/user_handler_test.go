@@ -370,19 +370,33 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 			}
 
 			var env struct {
-				StatusCode int              `json:"statusCode"`
-				Message    string           `json:"message"`
-				Data       userResponseBody `json:"data"`
+				StatusCode int      `json:"statusCode"`
+				Message    string   `json:"message"`
+				Data       userData `json:"data"`
 			}
 			if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
 				t.Fatalf("decode success envelope: %v", err)
 			}
-			if env.Data.ID != wantID {
-				t.Fatalf("got id %q, want %q", env.Data.ID, wantID)
+			if env.Data.User.ID != wantID {
+				t.Fatalf("got id %q, want %q", env.Data.User.ID, wantID)
 			}
-			if env.Data.FullName != "Jane Doe" {
-				t.Fatalf("got fullName %q, want %q", env.Data.FullName, "Jane Doe")
+			if env.Data.User.FullName != "Jane Doe" {
+				t.Fatalf("got fullName %q, want %q", env.Data.User.FullName, "Jane Doe")
 			}
 		})
+	}
+}
+
+func TestUserHandler_GetUserByID_MissingID(t *testing.T) {
+	h := NewUserHandler(stubUserServiceClient{})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/", nil)
+	req.SetPathValue("id", "")
+	rec := httptest.NewRecorder()
+
+	h.GetUserByID(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

@@ -509,6 +509,24 @@ The architectural rule remains:
 
 > A service owns its data.
 
+### Data Access
+
+Go services use **GORM** as the ORM for querying and persisting data on top of PostgreSQL.
+A new service should follow the same pattern as `user-service`
+(`internal/storage/postgres/`) rather than introducing a different data-access library.
+
+GORM is for querying and writing rows — it is **not** used for schema management:
+
+- Schema changes are explicit, forward-only SQL migration files, applied by the service's
+  own migration runner at startup. GORM's `AutoMigrate` is never used — inferring schema
+  from Go struct tags at runtime means the database can be altered with no reviewable
+  diff, which conflicts with the forward-only-migrations rule in `docs/CLAUDE.md` §5.4.
+- Row-mapping structs (the ones carrying `gorm:"..."` tags) are kept separate from a
+  service's domain types, so domain logic never depends on ORM-specific tags.
+
+See `docs/CLAUDE.md` §5.4 for the full backend rules this implies (mandatory GORM, no
+`AutoMigrate`, error translation, logging).
+
 ## 14. Caching
 
 Redis can be introduced for:

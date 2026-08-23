@@ -70,7 +70,7 @@ func run(logger *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
-		Handler:           router,
+		Handler:           middleware.CORS(cfg.CORSAllowedOrigin)(router),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
