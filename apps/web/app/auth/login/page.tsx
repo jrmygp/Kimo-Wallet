@@ -43,6 +43,12 @@ const LoginPage = () => {
           dispatch(setUser(data.user));
           router.push("/home");
         },
+        onError: (error) => {
+          if (error.message === "user not found") {
+            router.push("/auth/register");
+            localStorage.setItem("phoneNumber", `${values.country}-${values.number}`);
+          }
+        },
       });
     },
   });

@@ -1,6 +1,6 @@
 import * as yup from "yup";
 
-export const loginResponseSchema = yup.object({
+export const userResponseSchema = yup.object({
   user: yup
     .object({
       id: yup.string().required(),
@@ -12,4 +12,4 @@ export const loginResponseSchema = yup.object({
   accessToken: yup.string().required(),
 });
 
-export type LoginResponseData = yup.InferType<typeof loginResponseSchema>;
+export type UserResponseData = yup.InferType<typeof userResponseSchema>;

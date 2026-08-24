@@ -1,9 +1,9 @@
 import { AxiosError } from "axios";
 import { AxiosInstance } from "@/lib/axios";
 import { apiEnvelopeSchema } from "@/lib/api-envelope";
-import { loginResponseSchema, type LoginResponseData } from "@/features/auth/schemas/login-response.schema";
+import { userResponseSchema, type UserResponseData } from "@/features/auth/schemas/user-response.schema";
 
-const loginEnvelopeSchema = apiEnvelopeSchema(loginResponseSchema);
+const loginEnvelopeSchema = apiEnvelopeSchema(userResponseSchema);
 
 /**
  * Calls POST /v1/auth/login on the API Gateway. phoneNumber must already be
@@ -16,7 +16,7 @@ const loginEnvelopeSchema = apiEnvelopeSchema(loginResponseSchema);
  * safe to show a user) or a generic connectivity message if the gateway
  * never responded at all.
  */
-export async function loginUser(phoneNumber: string): Promise<LoginResponseData> {
+export async function loginUser(phoneNumber: string): Promise<UserResponseData> {
   try {
     const raw: unknown = await AxiosInstance.post("/v1/auth/login", { phoneNumber });
     const envelope = await loginEnvelopeSchema.validate(raw);
