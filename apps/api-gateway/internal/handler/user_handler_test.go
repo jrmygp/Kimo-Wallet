@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	userv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/user/v1"
@@ -25,9 +26,9 @@ type stubUserServiceClient struct {
 	loginErr     error
 	getUserResp  *userv1.GetUserByIDResponse
 	getUserErr   error
-	// gotGetUserID records the id GetUserByID was actually called with, so
-	// tests can assert the route param made it into the gRPC request.
-	gotGetUserID *string
+	// gotGetUserKimoID records the KimoID GetUserByID was actually called
+	// with, so tests can assert the route param made it into the gRPC request.
+	gotGetUserKimoID *string
 }
 
 func (s stubUserServiceClient) Register(ctx context.Context, in *userv1.RegisterRequest, opts ...grpc.CallOption) (*userv1.RegisterResponse, error) {
@@ -39,8 +40,8 @@ func (s stubUserServiceClient) Login(ctx context.Context, in *userv1.LoginReques
 }
 
 func (s stubUserServiceClient) GetUserByID(ctx context.Context, in *userv1.GetUserByIDRequest, opts ...grpc.CallOption) (*userv1.GetUserByIDResponse, error) {
-	if s.gotGetUserID != nil {
-		*s.gotGetUserID = in.GetId()
+	if s.gotGetUserKimoID != nil {
+		*s.gotGetUserKimoID = in.GetKimoId()
 	}
 	return s.getUserResp, s.getUserErr
 }
@@ -84,6 +85,7 @@ func TestUserHandler_Register(t *testing.T) {
 					PhoneNumber: "+6281234567890",
 					FullName:    "Jane Doe",
 					CreatedAt:   timestamppb.New(fixedTime),
+					KimoId:      "ABCDEF123456",
 				},
 				AccessToken: "signed.jwt.token",
 			}},
@@ -175,6 +177,12 @@ func TestUserHandler_Register(t *testing.T) {
 			if env.Data.AccessToken != "signed.jwt.token" {
 				t.Fatalf("got accessToken %q, want %q", env.Data.AccessToken, "signed.jwt.token")
 			}
+			if env.Data.User.KimoID != "ABCDEF123456" {
+				t.Fatalf("got kimoId %q, want %q", env.Data.User.KimoID, "ABCDEF123456")
+			}
+			if env.Data.User.ProfilePicture != nil {
+				t.Fatalf("got non-nil profilePicture %v, want nil (JSON null)", *env.Data.User.ProfilePicture)
+			}
 		})
 	}
 }
@@ -211,10 +219,12 @@ func TestUserHandler_Login(t *testing.T) {
 			body: `{"phoneNumber":"+6281234567890"}`,
 			stub: stubUserServiceClient{loginResp: &userv1.LoginResponse{
 				User: &userv1.User{
-					Id:          "11111111-1111-4111-8111-111111111111",
-					PhoneNumber: "+6281234567890",
-					FullName:    "Jane Doe",
-					CreatedAt:   timestamppb.New(fixedTime),
+					Id:             "11111111-1111-4111-8111-111111111111",
+					PhoneNumber:    "+6281234567890",
+					FullName:       "Jane Doe",
+					CreatedAt:      timestamppb.New(fixedTime),
+					KimoId:         "ABCDEF123456",
+					ProfilePicture: proto.String("https://example.com/avatar.png"),
 				},
 				AccessToken: "signed.jwt.token",
 			}},
@@ -299,6 +309,13 @@ func TestUserHandler_Login(t *testing.T) {
 			if env.Data.AccessToken != "signed.jwt.token" {
 				t.Fatalf("got accessToken %q, want %q", env.Data.AccessToken, "signed.jwt.token")
 			}
+			if env.Data.User.KimoID != "ABCDEF123456" {
+				t.Fatalf("got kimoId %q, want %q", env.Data.User.KimoID, "ABCDEF123456")
+			}
+			wantProfilePicture := "https://example.com/avatar.png"
+			if env.Data.User.ProfilePicture == nil || *env.Data.User.ProfilePicture != wantProfilePicture {
+				t.Fatalf("got profilePicture %v, want %q", env.Data.User.ProfilePicture, wantProfilePicture)
+			}
 		})
 	}
 }
@@ -306,6 +323,7 @@ func TestUserHandler_Login(t *testing.T) {
 func TestUserHandler_GetUserByID(t *testing.T) {
 	fixedTime := time.Date(2026, 8, 21, 12, 0, 0, 0, time.UTC)
 	const wantID = "11111111-1111-4111-8111-111111111111"
+	const wantKimoID = "ABCDEF123456"
 
 	tests := []struct {
 		name           string
@@ -321,6 +339,7 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 					PhoneNumber: "+6281234567890",
 					FullName:    "Jane Doe",
 					CreatedAt:   timestamppb.New(fixedTime),
+					KimoId:      wantKimoID,
 				},
 			}},
 			wantStatus: http.StatusOK,
@@ -341,12 +360,12 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var gotID string
-			tt.stub.gotGetUserID = &gotID
+			var gotKimoID string
+			tt.stub.gotGetUserKimoID = &gotKimoID
 			h := NewUserHandler(tt.stub)
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/users/"+wantID, nil)
-			req.SetPathValue("id", wantID)
+			req := httptest.NewRequest(http.MethodGet, "/v1/user/"+wantKimoID, nil)
+			req.SetPathValue("kimoId", wantKimoID)
 			rec := httptest.NewRecorder()
 
 			h.GetUserByID(rec, req)
@@ -354,8 +373,8 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d (body: %s)", rec.Code, tt.wantStatus, rec.Body.String())
 			}
-			if gotID != wantID {
-				t.Fatalf("GetUserByID called with id %q, want %q — route param not wired through", gotID, wantID)
+			if gotKimoID != wantKimoID {
+				t.Fatalf("GetUserByID called with kimoId %q, want %q — route param not wired through", gotKimoID, wantKimoID)
 			}
 
 			if tt.wantErrPresent {
@@ -383,6 +402,12 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 			if env.Data.User.FullName != "Jane Doe" {
 				t.Fatalf("got fullName %q, want %q", env.Data.User.FullName, "Jane Doe")
 			}
+			if env.Data.User.KimoID != wantKimoID {
+				t.Fatalf("got kimoId %q, want %q", env.Data.User.KimoID, wantKimoID)
+			}
+			if env.Data.User.ProfilePicture != nil {
+				t.Fatalf("got non-nil profilePicture %v, want nil (JSON null)", *env.Data.User.ProfilePicture)
+			}
 		})
 	}
 }
@@ -390,8 +415,8 @@ func TestUserHandler_GetUserByID(t *testing.T) {
 func TestUserHandler_GetUserByID_MissingID(t *testing.T) {
 	h := NewUserHandler(stubUserServiceClient{})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/", nil)
-	req.SetPathValue("id", "")
+	req := httptest.NewRequest(http.MethodGet, "/v1/user/", nil)
+	req.SetPathValue("kimoId", "")
 	rec := httptest.NewRecorder()
 
 	h.GetUserByID(rec, req)

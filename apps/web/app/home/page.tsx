@@ -21,6 +21,12 @@ import Link from "next/link";
 import { TransactionRow } from "@/features/transaction/components/transaction-row";
 import type { Transaction } from "@/features/transaction/types";
 import { useAppSelector } from "@/lib/store/hooks";
+import { Sheet, SheetContent, SheetClose, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { MdOutlineClose } from "react-icons/md";
+import { SearchIcon } from "lucide-react";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { useSearchUserQuery } from "@/features/wallet/hooks/use-search-user-query";
+import { UserSearchResultItem } from "@/features/wallet/components/user-search-result-item";
 
 const menuItemClassName =
   "flex flex-col items-center gap-1.5 cursor-pointer rounded-md py-3 transition-all duration-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kimo-500";
@@ -35,9 +41,20 @@ const transactions: Transaction[] = [
   { id: "5", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
 ];
 const HomePage = () => {
-  const [balanceHidden, setBalanceHidden] = useState(false);
   const userData = useAppSelector((state) => state.user);
-  console.log(userData.user)
+  const [balanceHidden, setBalanceHidden] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // Only set on Enter (see InputGroupInput's onKeyDown below), never on
+  // every keystroke — that's what makes the search fire once per
+  // submission instead of once per character typed.
+  const [searchId, setSearchId] = useState("");
+  const {
+    data: matchedUser,
+    isFetching: isSearching,
+    isError: searchFailed,
+    error: searchError,
+  } = useSearchUserQuery(searchId);
 
   return (
     <Page>
@@ -85,12 +102,78 @@ const HomePage = () => {
               <p className="text-sm text-center font-medium">Top Up</p>
             </button>
 
-            <button type="button" className={menuItemClassName}>
-              <span className={iconWrapperClassName}>
-                <MdSend size={22} />
-              </span>
-              <p className="text-sm text-center font-medium">Transfer</p>
-            </button>
+            <Sheet
+              open={open}
+              onOpenChange={(nextOpen) => {
+                setOpen(nextOpen);
+                if (!nextOpen) {
+                  // Start clean next time it's opened, rather than showing
+                  // a stale search from the previous visit.
+                  setQuery("");
+                  setSearchId("");
+                }
+              }}
+            >
+              <SheetTrigger className={menuItemClassName}>
+                <span className={iconWrapperClassName}>
+                  <MdSend size={22} />
+                </span>
+                <p className="text-sm text-center font-medium">Transfer</p>
+              </SheetTrigger>
+
+              <SheetContent
+                side="bottom"
+                showCloseButton={false}
+                className="data-[side=bottom]:h-[80vh] gap-0 p-0 rounded-t-2xl"
+              >
+                <SheetHeader className="gap-3 border-b border-border pb-4">
+                  <div className="flex items-center justify-between">
+                    <SheetTitle>Select account beneficiary</SheetTitle>
+                    <SheetClose>
+                      <MdOutlineClose size={20} className="cursor-pointer" />
+                    </SheetClose>
+                  </div>
+
+                  <InputGroup className="border">
+                    <InputGroupAddon>
+                      <SearchIcon />
+                    </InputGroupAddon>
+
+                    <InputGroupInput
+                      autoFocus
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        setSearchId(query.trim());
+                      }}
+                      placeholder="Search by KimoID..."
+                    />
+                  </InputGroup>
+                </SheetHeader>
+
+                <div role="listbox" className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                  {isSearching && <p className="px-2 py-4 text-center text-sm text-muted-foreground">Searching...</p>}
+
+                  {!isSearching && searchFailed && (
+                    <p role="alert" className="px-2 py-4 text-center text-sm text-destructive">
+                      {searchError.message}
+                    </p>
+                  )}
+
+                  {!isSearching && !searchFailed && matchedUser && (
+                    <UserSearchResultItem user={matchedUser} onClick={() => setOpen(false)} />
+                  )}
+
+                  {!isSearching && !searchFailed && !matchedUser && searchId.length === 0 && (
+                    <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      Search by your recipient&apos;s KimoID and press Enter.
+                    </p>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
 
             <Link href="/wallet/qr" className={menuItemClassName}>
               <span className={iconWrapperClassName}>

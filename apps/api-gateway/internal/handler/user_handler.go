@@ -48,6 +48,24 @@ type userResponseBody struct {
 	PhoneNumber string `json:"phoneNumber"`
 	FullName    string `json:"fullName"`
 	CreatedAt   string `json:"createdAt"`
+	// ProfilePicture is a pointer, not a plain string, so an unset picture
+	// serializes as JSON null rather than "" — the two are not the same
+	// thing to a client.
+	ProfilePicture *string `json:"profilePicture"`
+	KimoID         string  `json:"kimoId"`
+}
+
+// toUserResponseBody maps the gRPC User message to this handler's JSON
+// shape — shared by Register/Login/GetUserByID's responses.
+func toUserResponseBody(user *userv1.User) userResponseBody {
+	return userResponseBody{
+		ID:             user.GetId(),
+		PhoneNumber:    user.GetPhoneNumber(),
+		FullName:       user.GetFullName(),
+		CreatedAt:      user.GetCreatedAt().AsTime().Format(time.RFC3339),
+		ProfilePicture: user.ProfilePicture,
+		KimoID:         user.GetKimoId(),
+	}
 }
 
 type registerData struct {
@@ -90,12 +108,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, "user registered successfully", registerData{
-		User: userResponseBody{
-			ID:          resp.GetUser().GetId(),
-			PhoneNumber: resp.GetUser().GetPhoneNumber(),
-			FullName:    resp.GetUser().GetFullName(),
-			CreatedAt:   resp.GetUser().GetCreatedAt().AsTime().Format(time.RFC3339),
-		},
+		User:        toUserResponseBody(resp.GetUser()),
 		AccessToken: resp.GetAccessToken(),
 	})
 }
@@ -122,26 +135,23 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, "login successful", loginData{
-		User: userResponseBody{
-			ID:          resp.GetUser().GetId(),
-			PhoneNumber: resp.GetUser().GetPhoneNumber(),
-			FullName:    resp.GetUser().GetFullName(),
-			CreatedAt:   resp.GetUser().GetCreatedAt().AsTime().Format(time.RFC3339),
-		},
+		User:        toUserResponseBody(resp.GetUser()),
 		AccessToken: resp.GetAccessToken(),
 	})
 }
 
+// GetUserByID handles GET /v1/user/{kimoId}. Despite the RPC's name, the
+// path segment is the user's KimoID (see packages/contracts/user/v1/user.proto),
+// not the internal `id` — kept unrenamed to match the RPC/handler name.
 func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
-	// How do i retrieve the id from route param?
-	id := r.PathValue("id")
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "ID is invalid")
+	kimoID := r.PathValue("kimoId")
+	if kimoID == "" {
+		writeError(w, http.StatusBadRequest, "KimoID is invalid")
 		return
 	}
 
 	resp, err := h.client.GetUserByID(r.Context(), &userv1.GetUserByIDRequest{
-		Id: id,
+		KimoId: kimoID,
 	})
 	if err != nil {
 		writeGRPCError(w, err)
@@ -149,11 +159,6 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, "ok", userData{
-		User: userResponseBody{
-			ID:          resp.GetUser().GetId(),
-			PhoneNumber: resp.GetUser().GetPhoneNumber(),
-			FullName:    resp.GetUser().GetFullName(),
-			CreatedAt:   resp.GetUser().GetCreatedAt().AsTime().Format(time.RFC3339),
-		},
+		User: toUserResponseBody(resp.GetUser()),
 	})
 }

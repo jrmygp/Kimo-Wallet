@@ -18,6 +18,11 @@ Rules:
 
 ## Entries
 
+- 2026-08-29 — Entry 1 — [Add profile_picture + kimo_id to User; GetUserByID now looks up by KimoID](2026-08-29.md) — packages/contracts, apps/user-service, apps/api-gateway, apps/web — money:no — completed
+- 2026-08-28 — Entry 4 — [Fix GetUserByID returning 500 for a malformed (non-UUID) id](2026-08-28.md) — apps/user-service — money:no — completed
+- 2026-08-28 — Entry 3 — [Fix GetUserByID returning 500 instead of 404 for an unknown id](2026-08-28.md) — apps/user-service — money:no — completed
+- 2026-08-28 — Entry 2 — [Search-user-by-KimoID wired into the Transfer sheet (search on Enter only)](2026-08-28.md) — apps/web — money:no — completed
+- 2026-08-28 — Entry 1 — [Fix Transfer menu button: sheet wouldn't reliably open + styling mismatch](2026-08-28.md) — apps/web — money:no — completed
 - 2026-08-23 — Entry 3 — [Codify GORM as the mandatory ORM for all Go services](2026-08-23.md) — docs — money:no — completed
 - 2026-08-23 — Entry 2 — [Redux + redux-persist for logged-in user data](2026-08-23.md) — apps/web — money:no — completed
 - 2026-08-23 — Entry 1 — [Wire login page to login endpoint; fix real CORS gap; add TanStack Query](2026-08-23.md) — apps/web, apps/api-gateway — money:no — completed

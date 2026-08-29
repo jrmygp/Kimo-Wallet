@@ -14,6 +14,8 @@ import { useLoginMutation } from "@/features/auth/hooks/use-login-mutation";
 import { useRouter } from "next/navigation";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { setUser } from "@/features/auth/store/user-slice";
+import { useEffect } from "react";
+import { useAppSelector } from "@/lib/store/hooks";
 
 const countries = all();
 
@@ -21,6 +23,7 @@ const LoginPage = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const loginMutation = useLoginMutation();
+  const userData = useAppSelector((state) => state.user);
 
   const formik = useFormik({
     initialValues: {
@@ -55,6 +58,12 @@ const LoginPage = () => {
 
   const countryInvalid = formik.touched.country && !!formik.errors.country;
   const numberInvalid = formik.touched.number && !!formik.errors.number;
+
+  useEffect(() => {
+    if (userData.user?.id) {
+      router.push("/home")
+    }
+  }, [userData.user?.id]);
 
   return (
     <Page>

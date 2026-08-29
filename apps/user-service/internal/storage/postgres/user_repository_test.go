@@ -58,7 +58,7 @@ func TestUserRepository_Create(t *testing.T) {
 
 	input := domain.RegisterInput{PhoneNumber: "+6281234567890", FullName: "Jane Doe"}
 
-	user, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", input)
+	user, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", "ABCDEF123456", input)
 	if err != nil {
 		t.Fatalf("Create() error = %v, want nil", err)
 	}
@@ -67,6 +67,12 @@ func TestUserRepository_Create(t *testing.T) {
 	}
 	if user.CreatedAt.IsZero() {
 		t.Fatalf("Create() returned zero CreatedAt")
+	}
+	if user.KimoID != "ABCDEF123456" {
+		t.Fatalf("Create() returned kimo id %q, want %q", user.KimoID, "ABCDEF123456")
+	}
+	if user.ProfilePicture != nil {
+		t.Fatalf("Create() returned non-nil ProfilePicture %v, want nil (never set at registration)", *user.ProfilePicture)
 	}
 }
 
@@ -77,13 +83,30 @@ func TestUserRepository_Create_DuplicatePhoneNumber(t *testing.T) {
 
 	input := domain.RegisterInput{PhoneNumber: "+6281234567890", FullName: "Jane Doe"}
 
-	if _, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", input); err != nil {
+	if _, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", "ABCDEF123456", input); err != nil {
 		t.Fatalf("first Create() error = %v, want nil", err)
 	}
 
-	_, err := repo.Create(ctx, "22222222-2222-4222-8222-222222222222", input)
+	_, err := repo.Create(ctx, "22222222-2222-4222-8222-222222222222", "GHIJKL789012", input)
 	if !errors.Is(err, domain.ErrPhoneNumberTaken) {
 		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrPhoneNumberTaken)
+	}
+}
+
+func TestUserRepository_Create_DuplicateKimoID(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	if _, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", "ABCDEF123456",
+		domain.RegisterInput{PhoneNumber: "+6281234567890", FullName: "Jane Doe"}); err != nil {
+		t.Fatalf("first Create() error = %v, want nil", err)
+	}
+
+	_, err := repo.Create(ctx, "22222222-2222-4222-8222-222222222222", "ABCDEF123456",
+		domain.RegisterInput{PhoneNumber: "+6289876543210", FullName: "John Smith"})
+	if !errors.Is(err, domain.ErrKimoIDCollision) {
+		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrKimoIDCollision)
 	}
 }
 
@@ -101,15 +124,16 @@ func TestUserRepository_Create_ConcurrentSamePhoneNumber(t *testing.T) {
 		"11111111-1111-4111-8111-111111111111",
 		"22222222-2222-4222-8222-222222222222",
 	}
+	kimoIDs := []string{"ABCDEF123456", "GHIJKL789012"}
 
 	var wg sync.WaitGroup
 	errs := make([]error, len(ids))
 	for i, id := range ids {
 		wg.Add(1)
-		go func(i int, id string) {
+		go func(i int, id, kimoID string) {
 			defer wg.Done()
-			_, errs[i] = repo.Create(ctx, id, input)
-		}(i, id)
+			_, errs[i] = repo.Create(ctx, id, kimoID, input)
+		}(i, id, kimoIDs[i])
 	}
 	wg.Wait()
 
@@ -143,7 +167,7 @@ func TestUserRepository_Login(t *testing.T) {
 	repo := NewUserRepository(db)
 	ctx := context.Background()
 
-	created, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111",
+	created, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", "ABCDEF123456",
 		domain.RegisterInput{PhoneNumber: "+6281234567890", FullName: "Jane Doe"})
 	if err != nil {
 		t.Fatalf("Create() error = %v, want nil", err)
@@ -156,6 +180,9 @@ func TestUserRepository_Login(t *testing.T) {
 	if user.ID != created.ID || user.PhoneNumber != created.PhoneNumber || user.FullName != created.FullName {
 		t.Fatalf("Login() returned %+v, want %+v", user, created)
 	}
+	if user.KimoID != created.KimoID {
+		t.Fatalf("Login() returned kimo id %q, want %q", user.KimoID, created.KimoID)
+	}
 }
 
 func TestUserRepository_Login_UnknownPhoneNumber(t *testing.T) {
@@ -166,5 +193,38 @@ func TestUserRepository_Login_UnknownPhoneNumber(t *testing.T) {
 	_, err := repo.Login(ctx, domain.LoginInput{PhoneNumber: "+6281234567890"})
 	if !errors.Is(err, domain.ErrUserNotFound) {
 		t.Fatalf("Login() error = %v, want %v", err, domain.ErrUserNotFound)
+	}
+}
+
+func TestUserRepository_GetUserByID(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	created, err := repo.Create(ctx, "11111111-1111-4111-8111-111111111111", "ABCDEF123456",
+		domain.RegisterInput{PhoneNumber: "+6281234567890", FullName: "Jane Doe"})
+	if err != nil {
+		t.Fatalf("Create() error = %v, want nil", err)
+	}
+
+	// Looks up by kimo_id, not the primary key id, despite the method name
+	// — see the doc comment on GetUserByID.
+	user, err := repo.GetUserByID(ctx, "ABCDEF123456")
+	if err != nil {
+		t.Fatalf("GetUserByID() error = %v, want nil", err)
+	}
+	if user.ID != created.ID || user.KimoID != created.KimoID {
+		t.Fatalf("GetUserByID() returned %+v, want %+v", user, created)
+	}
+}
+
+func TestUserRepository_GetUserByID_UnknownKimoID(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewUserRepository(db)
+	ctx := context.Background()
+
+	_, err := repo.GetUserByID(ctx, "ZZZZZZ999999")
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		t.Fatalf("GetUserByID() error = %v, want %v", err, domain.ErrUserNotFound)
 	}
 }

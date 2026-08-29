@@ -18,7 +18,21 @@ import (
 type userService interface {
 	Register(ctx context.Context, phoneNumber, fullName string) (domain.User, string, error)
 	Login(ctx context.Context, phoneNumber string) (domain.User, string, error)
-	GetUserByID(ctx context.Context, id string) (domain.User, error)
+	// GetUserByID looks a user up by KimoID, not the internal id.
+	GetUserByID(ctx context.Context, kimoID string) (domain.User, error)
+}
+
+// toProtoUser maps a domain.User to the wire User message shared by
+// Register/Login/GetUserByID's responses.
+func toProtoUser(user domain.User) *userv1.User {
+	return &userv1.User{
+		Id:             user.ID,
+		PhoneNumber:    user.PhoneNumber,
+		FullName:       user.FullName,
+		CreatedAt:      timestamppb.New(user.CreatedAt),
+		ProfilePicture: user.ProfilePicture,
+		KimoId:         user.KimoID,
+	}
 }
 
 type UserServer struct {
@@ -44,12 +58,7 @@ func (s *UserServer) Register(ctx context.Context, req *userv1.RegisterRequest) 
 	}
 
 	return &userv1.RegisterResponse{
-		User: &userv1.User{
-			Id:          user.ID,
-			PhoneNumber: user.PhoneNumber,
-			FullName:    user.FullName,
-			CreatedAt:   timestamppb.New(user.CreatedAt),
-		},
+		User:        toProtoUser(user),
 		AccessToken: token,
 	}, nil
 }
@@ -68,28 +77,25 @@ func (s *UserServer) Login(ctx context.Context, req *userv1.LoginRequest) (*user
 	}
 
 	return &userv1.LoginResponse{
-		User: &userv1.User{
-			Id:          user.ID,
-			PhoneNumber: user.PhoneNumber,
-			FullName:    user.FullName,
-			CreatedAt:   timestamppb.New(user.CreatedAt),
-		},
+		User:        toProtoUser(user),
 		AccessToken: token,
 	}, nil
 }
 
 func (s *UserServer) GetUserByID(ctx context.Context, req *userv1.GetUserByIDRequest) (*userv1.GetUserByIDResponse, error) {
-	user, err := s.service.GetUserByID(ctx, req.GetId())
+	user, err := s.service.GetUserByID(ctx, req.GetKimoId())
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to find user")
+		switch {
+		case errors.Is(err, domain.ErrInvalidKimoID):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, domain.ErrUserNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, "failed to find user")
+		}
 	}
 
 	return &userv1.GetUserByIDResponse{
-		User: &userv1.User{
-			Id:          user.ID,
-			PhoneNumber: user.PhoneNumber,
-			FullName:    user.FullName,
-			CreatedAt:   timestamppb.New(user.CreatedAt),
-		},
+		User: toProtoUser(user),
 	}, nil
 }

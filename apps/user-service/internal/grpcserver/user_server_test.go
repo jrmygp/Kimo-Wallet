@@ -30,7 +30,7 @@ func (s stubUserService) Login(ctx context.Context, phoneNumber string) (domain.
 	return s.user, s.token, s.err
 }
 
-func (s stubUserService) GetUserByID(ctx context.Context, id string) (domain.User, error) {
+func (s stubUserService) GetUserByID(ctx context.Context, kimoID string) (domain.User, error) {
 	return s.user, s.err
 }
 
@@ -93,6 +93,102 @@ func TestUserServer_Register(t *testing.T) {
 				}
 				if resp.GetAccessToken() != tt.stub.token {
 					t.Fatalf("got access token %q, want %q", resp.GetAccessToken(), tt.stub.token)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if got := status.Code(err); got != tt.wantCode {
+				t.Fatalf("got code %v, want %v", got, tt.wantCode)
+			}
+			if tt.wantCode == codes.Internal && status.Convert(err).Message() == tt.stub.err.Error() {
+				t.Fatalf("internal error message leaked implementation detail: %q", status.Convert(err).Message())
+			}
+		})
+	}
+}
+
+func TestUserServer_GetUserByID(t *testing.T) {
+	profilePicture := "https://example.com/avatar.png"
+
+	tests := []struct {
+		name     string
+		stub     stubUserService
+		wantCode codes.Code
+	}{
+		{
+			name: "success returns the matched user, including KimoID and profile picture",
+			stub: stubUserService{
+				user: domain.User{
+					ID:             "11111111-1111-4111-8111-111111111111",
+					PhoneNumber:    "+6281234567890",
+					FullName:       "Jane Doe",
+					CreatedAt:      time.Unix(0, 0),
+					KimoID:         "ABCDEF123456",
+					ProfilePicture: &profilePicture,
+				},
+			},
+			wantCode: codes.OK,
+		},
+		{
+			name: "success with no profile picture set stays nil, not empty string",
+			stub: stubUserService{
+				user: domain.User{
+					ID:          "11111111-1111-4111-8111-111111111111",
+					PhoneNumber: "+6281234567890",
+					FullName:    "Jane Doe",
+					CreatedAt:   time.Unix(0, 0),
+					KimoID:      "ABCDEF123456",
+				},
+			},
+			wantCode: codes.OK,
+		},
+		{
+			name:     "unknown KimoID maps to NotFound, not Internal",
+			stub:     stubUserService{err: domain.ErrUserNotFound},
+			wantCode: codes.NotFound,
+		},
+		{
+			name:     "malformed KimoID maps to InvalidArgument, not Internal",
+			stub:     stubUserService{err: domain.ErrInvalidKimoID},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name:     "unexpected error maps to Internal and does not leak details",
+			stub:     stubUserService{err: errors.New("connection refused")},
+			wantCode: codes.Internal,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := NewUserServer(tt.stub)
+
+			resp, err := server.GetUserByID(context.Background(), &userv1.GetUserByIDRequest{
+				KimoId: "ABCDEF123456",
+			})
+
+			if tt.wantCode == codes.OK {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if resp.GetUser().GetId() != tt.stub.user.ID {
+					t.Fatalf("got user id %q, want %q", resp.GetUser().GetId(), tt.stub.user.ID)
+				}
+				if resp.GetUser().GetKimoId() != tt.stub.user.KimoID {
+					t.Fatalf("got kimo id %q, want %q", resp.GetUser().GetKimoId(), tt.stub.user.KimoID)
+				}
+				gotProfilePicture := resp.GetUser().ProfilePicture
+				wantProfilePicture := tt.stub.user.ProfilePicture
+				switch {
+				case gotProfilePicture == nil && wantProfilePicture == nil:
+					// both unset, fine
+				case gotProfilePicture == nil || wantProfilePicture == nil:
+					t.Fatalf("got profile picture %v, want %v", gotProfilePicture, wantProfilePicture)
+				case *gotProfilePicture != *wantProfilePicture:
+					t.Fatalf("got profile picture %q, want %q", *gotProfilePicture, *wantProfilePicture)
 				}
 				return
 			}

@@ -21,6 +21,6 @@ func NewRouter(userHandler UserHandler, requireAuth func(http.Handler) http.Hand
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/auth/register", userHandler.Register)
 	mux.HandleFunc("POST /v1/auth/login", userHandler.Login)
-	mux.Handle("GET /v1/user/{id}", requireAuth(http.HandlerFunc(userHandler.GetUserByID)))
+	mux.Handle("GET /v1/user/{kimoId}", requireAuth(http.HandlerFunc(userHandler.GetUserByID)))
 	return mux
 }

@@ -89,3 +89,70 @@ func TestNewRegisterInput(t *testing.T) {
 		})
 	}
 }
+
+func TestNewGetUserByKimoIDInput(t *testing.T) {
+	tests := []struct {
+		name    string
+		id      string
+		want    string
+		wantErr error
+	}{
+		{
+			name: "valid KimoID",
+			id:   "ABCDEF123456",
+			want: "ABCDEF123456",
+		},
+		{
+			name: "lowercase is upper-cased, not rejected",
+			id:   "abcdef123456",
+			want: "ABCDEF123456",
+		},
+		{
+			name: "trims surrounding whitespace",
+			id:   "  ABCDEF123456  ",
+			want: "ABCDEF123456",
+		},
+		{
+			name:    "empty id",
+			id:      "",
+			wantErr: ErrInvalidKimoID,
+		},
+		{
+			name:    "a phone number, not a KimoID",
+			id:      "+6281234567890",
+			wantErr: ErrInvalidKimoID,
+		},
+		{
+			name:    "a UUID, not a KimoID",
+			id:      "11111111-1111-4111-8111-111111111111",
+			wantErr: ErrInvalidKimoID,
+		},
+		{
+			name:    "one character short",
+			id:      "ABCDEF12345",
+			wantErr: ErrInvalidKimoID,
+		},
+		{
+			name:    "one character too long",
+			id:      "ABCDEF1234567",
+			wantErr: ErrInvalidKimoID,
+		},
+		{
+			name:    "contains a non-alphanumeric character",
+			id:      "ABCDEF-23456",
+			wantErr: ErrInvalidKimoID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewGetUserByKimoIDInput(tt.id)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("NewGetUserByKimoIDInput(%q) error = %v, want %v", tt.id, err, tt.wantErr)
+			}
+			if err == nil && got != tt.want {
+				t.Fatalf("NewGetUserByKimoIDInput(%q) = %q, want %q", tt.id, got, tt.want)
+			}
+		})
+	}
+}

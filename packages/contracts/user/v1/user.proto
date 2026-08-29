@@ -12,6 +12,14 @@ message User {
   string phone_number = 2;
   string full_name = 3;
   google.protobuf.Timestamp created_at = 4;
+  // May be unset — a user with no profile picture. `optional` (rather than
+  // plain string) so "unset" and "set to an empty string" aren't conflated.
+  optional string profile_picture = 5;
+  // Public-facing identifier: 12 uppercase alphanumeric characters
+  // (A-Z0-9), unique, auto-generated at creation. Used to look this user
+  // up (see GetUserByIDRequest) instead of the internal `id` above, which
+  // is never meant to be typed or shared by a user.
+  string kimo_id = 6;
 }
 
 message RegisterRequest {
@@ -37,7 +45,8 @@ message LoginResponse {
 }
 
 message GetUserByIDRequest {
-  string id = 1;
+  // The user's KimoID (see User.kimo_id above), not the internal `id`.
+  string kimo_id = 1;
 }
 
 message GetUserByIDResponse {
