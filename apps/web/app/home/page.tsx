@@ -27,6 +27,7 @@ import { SearchIcon } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { useSearchUserQuery } from "@/features/wallet/hooks/use-search-user-query";
 import { UserSearchResultItem } from "@/features/wallet/components/user-search-result-item";
+import { useRouter } from "next/navigation";
 
 const menuItemClassName =
   "flex flex-col items-center gap-1.5 cursor-pointer rounded-md py-3 transition-all duration-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kimo-500";
@@ -42,6 +43,7 @@ const transactions: Transaction[] = [
 ];
 const HomePage = () => {
   const userData = useAppSelector((state) => state.user);
+  const router = useRouter();
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -56,6 +58,11 @@ const HomePage = () => {
     error: searchError,
   } = useSearchUserQuery(searchId);
 
+  const onClickUser = (userId: string) => {
+    setOpen(false);
+    router.push(`/wallet/transfer/${userId}`);
+  };
+
   return (
     <Page>
       <div className="flex min-h-full w-full flex-col gap-8 items-center">
@@ -63,13 +70,13 @@ const HomePage = () => {
         <section className="bg-kimo-500 w-full px-4 h-40 flex flex-col py-4 sm:flex-row sm:py-0 sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Avatar size="2xl">
-              <AvatarImage src="https://github.com/shadcn.png" />
-              <AvatarFallback>CN</AvatarFallback>
+              <AvatarImage src={userData.user?.profilePicture || "https://github.com/shadcn.png"} />
+              <AvatarFallback>{userData.user?.fullName.slice(0, 2).toUpperCase() ?? "CN"}</AvatarFallback>
             </Avatar>
 
             <div className="flex flex-col">
-              <p className="font-bold text-xl text-white">Jhon Doe</p>
-              <p className="text-sm text-white/80">+6281234567890</p>
+              <p className="font-bold text-xl text-white">{userData.user?.fullName}</p>
+              <p className="text-sm text-white/80">{userData.user?.phoneNumber}</p>
             </div>
           </div>
 
@@ -148,7 +155,7 @@ const HomePage = () => {
                         event.preventDefault();
                         setSearchId(query.trim());
                       }}
-                      placeholder="Search by KimoID..."
+                      placeholder="Search by KimoID"
                     />
                   </InputGroup>
                 </SheetHeader>
@@ -163,12 +170,12 @@ const HomePage = () => {
                   )}
 
                   {!isSearching && !searchFailed && matchedUser && (
-                    <UserSearchResultItem user={matchedUser} onClick={() => setOpen(false)} />
+                    <UserSearchResultItem user={matchedUser} onClick={(userId: string) => onClickUser(userId)} />
                   )}
 
                   {!isSearching && !searchFailed && !matchedUser && searchId.length === 0 && (
                     <p className="px-2 py-4 text-center text-sm text-muted-foreground">
-                      Search by your recipient&apos;s KimoID and press Enter.
+                      Search by your recipient&apos;s KimoID.
                     </p>
                   )}
                 </div>
@@ -179,7 +186,7 @@ const HomePage = () => {
               <span className={iconWrapperClassName}>
                 <MdOutlineQrCode2 size={22} />
               </span>
-              <p className="text-sm text-center font-medium">QR Code</p>
+              <p className="text-sm text-center font-medium">QRIS</p>
             </Link>
 
             <Link href="/wallet/history" className={menuItemClassName}>

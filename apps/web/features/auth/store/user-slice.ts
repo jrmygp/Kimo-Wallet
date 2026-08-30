@@ -1,9 +1,9 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { LoginResponseData } from "@/features/auth/schemas/user-response.schema";
+import type { UserResponseData } from "@/features/auth/schemas/user-response.schema";
 
 // Reuses the shape already validated by userResponseSchema instead of
 // hand-declaring a duplicate interface, so the two can't drift.
-export type UserProfile = LoginResponseData["user"];
+export type UserProfile = UserResponseData["user"];
 
 interface UserState {
   user: UserProfile | null;

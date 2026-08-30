@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-08-29 — Entry 2 — [Auto-logout on token expiry (reactive 401 handler + proactive client-side timer)](2026-08-29.md) — apps/web — money:no — completed
 - 2026-08-29 — Entry 1 — [Add profile_picture + kimo_id to User; GetUserByID now looks up by KimoID](2026-08-29.md) — packages/contracts, apps/user-service, apps/api-gateway, apps/web — money:no — completed
 - 2026-08-28 — Entry 4 — [Fix GetUserByID returning 500 for a malformed (non-UUID) id](2026-08-28.md) — apps/user-service — money:no — completed
 - 2026-08-28 — Entry 3 — [Fix GetUserByID returning 500 instead of 404 for an unknown id](2026-08-28.md) — apps/user-service — money:no — completed
