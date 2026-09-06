@@ -1,13 +1,11 @@
-module github.com/jrmygp/kimo-wallet/apps/user-service
+module github.com/jrmygp/kimo-wallet/apps/wallet-service
 
 go 1.25.0
 
 require (
-	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/segmentio/kafka-go v0.4.51
-	google.golang.org/grpc v1.83.1
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.2
 	gorm.io/gorm v1.31.2
@@ -21,9 +19,6 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 )

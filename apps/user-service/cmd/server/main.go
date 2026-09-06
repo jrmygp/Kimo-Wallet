@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
@@ -17,6 +18,8 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/authtoken"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/config"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/grpcserver"
+	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/kafkaproducer"
+	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/outbox"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/service"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/internal/storage/postgres"
 	"github.com/jrmygp/kimo-wallet/apps/user-service/migrations"
@@ -25,6 +28,12 @@ import (
 )
 
 const serviceName = "user-service"
+
+// outboxRelayInterval is how often the outbox relay polls for unpublished
+// events. Not tunable via env yet — a fixed, boring interval is fine for
+// this phase; see internal/outbox for why a bounded-not-tight retry on a
+// timer is the correct behavior here, not a workaround.
+const outboxRelayInterval = 2 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", serviceName)
@@ -73,6 +82,18 @@ func run(logger *slog.Logger) error {
 	minter := authtoken.NewMinter(cfg.JWTSecret)
 	userService := service.NewUserService(repo, minter)
 	userServer := grpcserver.NewUserServer(userService)
+
+	producer := kafkaproducer.New(cfg.KafkaBrokers)
+	defer func() {
+		if err := producer.Close(); err != nil {
+			logger.Error("close kafka producer", "error", err.Error())
+		}
+	}()
+
+	outboxRepo := postgres.NewOutboxRepository(db)
+	relay := outbox.NewRelay(outboxRepo, producer, outboxRelayInterval, logger)
+	go relay.Run(ctx)
+	logger.Info("outbox relay started", "interval", outboxRelayInterval.String())
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {

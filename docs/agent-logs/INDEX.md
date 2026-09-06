@@ -18,6 +18,10 @@ Rules:
 
 ## Entries
 
+- 2026-09-05 — Entry 4 — [wallet-service consumes user.created and creates wallets (Phase 3 of 3)](2026-09-05.md) — docker-compose.yml, .env, .env.example, apps/wallet-service — money:no — completed
+- 2026-09-05 — Entry 3 — [user-service publishes user.created (Phase 2 of 3: transactional outbox + Kafka producer)](2026-09-05.md) — packages/contracts, apps/user-service — money:no — completed
+- 2026-09-05 — Entry 2 — [Codify "never `docker compose down -v`" in the mandatory rules](2026-09-05.md) — docs — money:no — completed
+- 2026-09-05 — Entry 1 — [Kafka infra (Phase 1 of 3: user.created → wallet-creation event flow)](2026-09-05.md) — docker-compose.yml, .env, .env.example — money:no — completed
 - 2026-08-29 — Entry 2 — [Auto-logout on token expiry (reactive 401 handler + proactive client-side timer)](2026-08-29.md) — apps/web — money:no — completed
 - 2026-08-29 — Entry 1 — [Add profile_picture + kimo_id to User; GetUserByID now looks up by KimoID](2026-08-29.md) — packages/contracts, apps/user-service, apps/api-gateway, apps/web — money:no — completed
 - 2026-08-28 — Entry 4 — [Fix GetUserByID returning 500 for a malformed (non-UUID) id](2026-08-28.md) — apps/user-service — money:no — completed

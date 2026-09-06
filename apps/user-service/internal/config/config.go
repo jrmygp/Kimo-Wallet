@@ -4,12 +4,14 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	GRPCPort    string
-	DatabaseURL string
-	JWTSecret   []byte
+	GRPCPort     string
+	DatabaseURL  string
+	JWTSecret    []byte
+	KafkaBrokers []string
 }
 
 // Load reads configuration from environment variables, failing fast if a
@@ -31,9 +33,19 @@ func Load() (Config, error) {
 		grpcPort = "50051"
 	}
 
+	// Defaults to the local dev broker (docker-compose.yml's kafka
+	// service). Outbox publishing failing/retrying is expected to be
+	// tolerated, not fatal (see internal/outbox), so this — unlike
+	// DatabaseURL/JWTSecret — has a fallback rather than failing fast.
+	kafkaBrokers := os.Getenv("USER_SERVICE_KAFKA_BROKERS")
+	if kafkaBrokers == "" {
+		kafkaBrokers = "localhost:9092"
+	}
+
 	return Config{
-		GRPCPort:    grpcPort,
-		DatabaseURL: databaseURL,
-		JWTSecret:   []byte(jwtSecret),
+		GRPCPort:     grpcPort,
+		DatabaseURL:  databaseURL,
+		JWTSecret:    []byte(jwtSecret),
+		KafkaBrokers: strings.Split(kafkaBrokers, ","),
 	}, nil
 }

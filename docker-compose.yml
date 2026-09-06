@@ -16,5 +16,63 @@ services:
       timeout: 5s
       retries: 5
 
+  # A separate database from user-db — "a service owns its data"
+  # (docs/CLAUDE.md §4 rule 1) means wallet-service gets its own Postgres,
+  # not a shared instance or a second database bolted onto user-db's.
+  wallet-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${WALLET_DB_USER}
+      POSTGRES_PASSWORD: ${WALLET_DB_PASSWORD}
+      POSTGRES_DB: ${WALLET_DB_NAME}
+    ports:
+      - "${WALLET_DB_PORT}:5432"
+    volumes:
+      - wallet_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WALLET_DB_USER} -d ${WALLET_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Single-node KRaft-mode Kafka (broker + controller combined, no separate
+  # Zookeeper container) — the officially published Apache image, not a
+  # third-party one. Go services run natively on the host (go run), same as
+  # user-db, so this only needs one listener advertised at localhost.
+  kafka:
+    image: apache/kafka:3.9.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # Combined broker+controller nodes must list the controller listener
+      # here too (with a routable address, not 0.0.0.0) — omitting it made
+      # the image's wrapper fall back to KAFKA_LISTENERS's 0.0.0.0 for that
+      # entry, which Kafka's own startup validation rejects outright.
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT},CONTROLLER://localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Single-node dev cluster — no replication to fan out across.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # A fixed, generated-once cluster id for this dev cluster's on-disk
+      # metadata. Not a secret — just needs to stay the same across
+      # restarts of the same volume, so it's fine to commit.
+      CLUSTER_ID: Ky6rw3nAQJiLLT53hikIsA
+    ports:
+      - "${KAFKA_PORT}:9092"
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
 volumes:
   user_db_data:
+  wallet_db_data:
+  kafka_data:

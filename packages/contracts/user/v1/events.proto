@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/jrmygp/kimo-wallet/apps/user-service/gen/user/v1;userv1";
+
+// UserCreated is published by User Service on the "user.created" Kafka
+// topic after a new user is successfully registered (see
+// docs/guides/Kimo-Wallet-Architecture.md §5's async event list). Wallet
+// Service consumes this to provision that user's wallet.
+//
+// Deliberately minimal: only what Wallet Service actually needs to create
+// a wallet row. Profile fields (phone_number, full_name, ...) are User
+// Service's data — publishing them here would leak ownership across the
+// service boundary for no reason (docs/CLAUDE.md §4 rule 1).
+message UserCreated {
+  string user_id = 1;
+  google.protobuf.Timestamp created_at = 2;
+}

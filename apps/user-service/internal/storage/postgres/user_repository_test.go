@@ -44,8 +44,8 @@ func newTestDB(t *testing.T) *gorm.DB {
 		t.Fatalf("run migrations: %v", err)
 	}
 
-	if err := db.Exec("TRUNCATE TABLE users").Error; err != nil {
-		t.Fatalf("truncate users table before test: %v", err)
+	if err := db.Exec("TRUNCATE TABLE users, outbox_events").Error; err != nil {
+		t.Fatalf("truncate users/outbox_events tables before test: %v", err)
 	}
 
 	return db
@@ -74,6 +74,20 @@ func TestUserRepository_Create(t *testing.T) {
 	if user.ProfilePicture != nil {
 		t.Fatalf("Create() returned non-nil ProfilePicture %v, want nil (never set at registration)", *user.ProfilePicture)
 	}
+
+	// The transactional outbox write is the whole point of Create's
+	// transaction — prove the event actually landed, not just that the
+	// user row did.
+	var outboxRow outboxEventModel
+	if err := db.Where("event_type = ?", EventTypeUserCreated).First(&outboxRow).Error; err != nil {
+		t.Fatalf("expected a %q outbox event, got error: %v", EventTypeUserCreated, err)
+	}
+	if outboxRow.PublishedAt != nil {
+		t.Fatalf("outbox event was already marked published at insert time, want nil until the relay publishes it")
+	}
+	if len(outboxRow.Payload) == 0 {
+		t.Fatalf("outbox event has an empty payload")
+	}
 }
 
 func TestUserRepository_Create_DuplicatePhoneNumber(t *testing.T) {
@@ -90,6 +104,17 @@ func TestUserRepository_Create_DuplicatePhoneNumber(t *testing.T) {
 	_, err := repo.Create(ctx, "22222222-2222-4222-8222-222222222222", "GHIJKL789012", input)
 	if !errors.Is(err, domain.ErrPhoneNumberTaken) {
 		t.Fatalf("second Create() error = %v, want %v", err, domain.ErrPhoneNumberTaken)
+	}
+
+	// The failed second Create() must not have left behind an outbox
+	// event for the user it failed to create — the whole transaction,
+	// user insert AND outbox insert together, must have rolled back.
+	var outboxCount int64
+	if err := db.Model(&outboxEventModel{}).Count(&outboxCount).Error; err != nil {
+		t.Fatalf("count outbox events: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("got %d outbox events after one success and one failed Create(), want exactly 1", outboxCount)
 	}
 }
 

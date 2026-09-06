@@ -299,6 +299,12 @@ Anything with `touches_money: yes` must answer all of these in the log entry:
    human explicitly asking. Prefer boring. Prefer fewer moving parts.
 7. **Do not add a runtime dependency** (npm/Go module) without stating why the stdlib or an
    existing dependency is insufficient. Log it in your entry.
+8. **Never run `docker compose down -v`** (with or without a service name after `down` — it does
+   not scope to one service; `down` tears down the whole project regardless). It has already come
+   within one blocked removal of deleting a real local Postgres volume in this repo while someone
+   was trying to reset a single container. To reset one service, target it precisely:
+   `docker rm -f <container>` + `docker volume rm <specific-volume>`, or `docker compose stop
+   <service>` if you don't need to wipe its volume at all.
 
 ---
 
