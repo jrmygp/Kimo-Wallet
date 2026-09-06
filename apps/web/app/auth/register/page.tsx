@@ -10,8 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { registerValidation } from "@/features/auth/schemas/register.schema";
 import { useRegisterMutation } from "@/features/auth/hooks/use-register-mutation";
-import { useAppDispatch } from "@/lib/store/hooks";
-import { setUser } from "@/features/auth/store/user-slice";
 import { useRouter } from "next/navigation";
 import { all } from "country-codes-list";
 
@@ -19,7 +17,6 @@ const countries = all();
 
 const RegisterPage = () => {
   const router = useRouter();
-  const dispatch = useAppDispatch();
   const registerMutation = useRegisterMutation();
   const phoneNumberArr = localStorage.getItem("phoneNumber")?.split("-") ?? [];
 
@@ -39,11 +36,15 @@ const RegisterPage = () => {
       registerMutation.mutate(
         { fullName: values.fullName, phoneNumber },
         {
-          onSuccess: (data) => {
-            localStorage.removeItem("phoneNumber");
-            localStorage.setItem("token", data.accessToken);
-            dispatch(setUser(data.user));
-            router.push("/home");
+          onSuccess: () => {
+            // Registering no longer starts a session (see api-gateway's
+            // Register handler) — the account exists, but the user must
+            // log in separately with the same phone number. Keep it in
+            // localStorage under the same key/format the login page
+            // itself writes when it redirects *here* on "user not
+            // found", so the login page can prefill it.
+            localStorage.setItem("phoneNumber", `${values.country}-${values.number}`);
+            router.push("/auth/login");
           },
         },
       );

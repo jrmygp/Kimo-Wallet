@@ -8,12 +8,15 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"google.golang.org/grpc"
 
 	userv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/user/v1"
+	walletv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/wallet/v1"
+	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/jwtauth"
 )
 
 // maxRequestBodyBytes bounds request bodies read by this handler — a
@@ -30,12 +33,22 @@ type userServiceClient interface {
 	GetUserByID(ctx context.Context, in *userv1.GetUserByIDRequest, opts ...grpc.CallOption) (*userv1.GetUserByIDResponse, error)
 }
 
-type UserHandler struct {
-	client userServiceClient
+// walletServiceClient is the subset of walletv1.WalletServiceClient this
+// handler depends on — used only to enrich GetUserByID's response with
+// the caller's own wallet (see GetUserByID: never called, let alone
+// exposed, for anyone else's wallet).
+type walletServiceClient interface {
+	GetWalletByUserID(ctx context.Context, in *walletv1.GetWalletByUserIDRequest, opts ...grpc.CallOption) (*walletv1.GetWalletByUserIDResponse, error)
 }
 
-func NewUserHandler(client userServiceClient) *UserHandler {
-	return &UserHandler{client: client}
+type UserHandler struct {
+	client       userServiceClient
+	walletClient walletServiceClient
+	logger       *slog.Logger
+}
+
+func NewUserHandler(client userServiceClient, walletClient walletServiceClient, logger *slog.Logger) *UserHandler {
+	return &UserHandler{client: client, walletClient: walletClient, logger: logger}
 }
 
 type registerRequestBody struct {
@@ -68,9 +81,10 @@ func toUserResponseBody(user *userv1.User) userResponseBody {
 	}
 }
 
+// registerData deliberately carries neither an access token nor a wallet:
+// registering no longer starts a session — see Register's doc comment.
 type registerData struct {
-	User        userResponseBody `json:"user"`
-	AccessToken string           `json:"accessToken"`
+	User userResponseBody `json:"user"`
 }
 
 type loginRequestBody struct {
@@ -78,17 +92,47 @@ type loginRequestBody struct {
 }
 
 type loginData struct {
-	User        userResponseBody `json:"user"`
-	AccessToken string           `json:"accessToken"`
+	User userResponseBody `json:"user"`
+	// Wallet is never nil-because-of-privacy the way GetUserByID's is:
+	// logging in is always the caller looking up *themselves*, so there's
+	// no "someone else's balance" case here — see fetchWallet. It's still
+	// a pointer because the lookup itself is still best-effort (see
+	// fetchWallet's doc comment).
+	Wallet      *walletResponseBody `json:"wallet"`
+	AccessToken string              `json:"accessToken"`
+}
+
+// walletResponseBody is deliberately only ever populated on
+// GetUserByID's response when the authenticated caller is looking up
+// their own profile — see GetUserByID. Balance is a raw JSON integer
+// (int64), not a string: docs/CLAUDE.md §3.3 rule 4 permits either for
+// money serialization, just never a float.
+type walletResponseBody struct {
+	Balance  int64  `json:"balance"`
+	Currency string `json:"currency"`
+	Status   string `json:"status"`
 }
 
 type userData struct {
 	User userResponseBody `json:"user"`
+	// Wallet is nil (JSON null) unless the authenticated caller's own id
+	// matches the looked-up user's — see GetUserByID. This endpoint is
+	// primarily used to look up *other* users (Transfer search), and a
+	// wallet balance is private to its owner.
+	Wallet *walletResponseBody `json:"wallet"`
 }
 
 // Register handles POST /v1/auth/register. It only decodes the request
 // shape and maps the result; phone number / full name validation is
 // user-service's job, not this handler's.
+//
+// Deliberately does not authenticate the caller: registering creates the
+// account but does not start a session — the client must call Login
+// separately with the same phone number. This is why the response carries
+// neither an access token nor a wallet (unlike Login/GetUserByID): going
+// through a separate Login step also means, in practice, that the async
+// Kafka wallet-provisioning race (see fetchWallet's doc comment) has
+// usually already resolved by the time the user is authenticated at all.
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 
@@ -108,8 +152,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, "user registered successfully", registerData{
-		User:        toUserResponseBody(resp.GetUser()),
-		AccessToken: resp.GetAccessToken(),
+		User: toUserResponseBody(resp.GetUser()),
 	})
 }
 
@@ -136,6 +179,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, "login successful", loginData{
 		User:        toUserResponseBody(resp.GetUser()),
+		Wallet:      h.fetchWallet(r.Context(), resp.GetUser().GetId()),
 		AccessToken: resp.GetAccessToken(),
 	})
 }
@@ -159,6 +203,49 @@ func (h *UserHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, "ok", userData{
-		User: toUserResponseBody(resp.GetUser()),
+		User:   toUserResponseBody(resp.GetUser()),
+		Wallet: h.walletForOwnProfile(r.Context(), resp.GetUser().GetId()),
 	})
+}
+
+// walletForOwnProfile returns lookedUpUserID's wallet, but only if the
+// authenticated caller (from the JWT claims RequireAuth put on the
+// context) *is* lookedUpUserID — this handler is primarily used to look
+// up other users (Transfer search), and a wallet balance is private to
+// its owner, so it's never even fetched, let alone returned, for anyone
+// else's id. Returns nil if the caller doesn't match or there are no
+// claims on the context at all (e.g. GetUserByID is the only caller of
+// this, and it's always authenticated, but this stays defensive rather
+// than assuming that never changes); see fetchWallet for the rest.
+func (h *UserHandler) walletForOwnProfile(ctx context.Context, lookedUpUserID string) *walletResponseBody {
+	claims, ok := jwtauth.ClaimsFromContext(ctx)
+	if !ok || claims.Subject != lookedUpUserID {
+		return nil
+	}
+
+	return h.fetchWallet(ctx, claims.Subject)
+}
+
+// fetchWallet fetches userID's wallet and converts it to the JSON shape,
+// or returns nil (never an error) if the lookup fails. Wallet enrichment
+// is always best-effort on top of an already-successful user operation
+// (login or profile lookup) — never something that fails the request
+// itself. This matters especially right after registration/login: wallet
+// provisioning is asynchronous (Kafka — see 2026-09-05's entries), so a
+// brand new user briefly having no wallet yet is an expected race, not
+// an error, and must never turn a successful login into a broken one.
+func (h *UserHandler) fetchWallet(ctx context.Context, userID string) *walletResponseBody {
+	resp, err := h.walletClient.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{
+		UserId: userID,
+	})
+	if err != nil {
+		h.logger.Error("fetch wallet", "error", err.Error(), "user_id", userID)
+		return nil
+	}
+
+	return &walletResponseBody{
+		Balance:  resp.GetWallet().GetBalance(),
+		Currency: resp.GetWallet().GetCurrency(),
+		Status:   resp.GetWallet().GetStatus(),
+	}
 }

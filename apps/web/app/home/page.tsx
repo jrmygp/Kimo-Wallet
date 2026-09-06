@@ -84,7 +84,9 @@ const HomePage = () => {
             <p className="font-bold text-xl text-white text-left sm:text-right">My Balance</p>
             <div className="flex items-center gap-2">
               <p className="text-2xl text-white text-left sm:text-right tabular-nums">
-                {balanceHidden ? "Rp ••••••" : "Rp 100.000"}
+                {balanceHidden
+                  ? "Rp ••••••"
+                  : `${userData.balance?.currency} ${userData.balance?.balance?.toLocaleString("id")}`}
               </p>
               <button
                 type="button"

@@ -23,6 +23,7 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/middleware"
 
 	userv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/user/v1"
+	walletv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/wallet/v1"
 )
 
 const serviceName = "api-gateway"
@@ -63,8 +64,16 @@ func run(logger *slog.Logger) error {
 	}
 	defer userServiceConn.Close()
 
+	// Same insecure-transport caveat as userServiceConn above.
+	walletServiceConn, err := grpc.NewClient(cfg.WalletServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("connect to wallet-service: %w", err)
+	}
+	defer walletServiceConn.Close()
+
 	userClient := userv1.NewUserServiceClient(userServiceConn)
-	userHandler := handler.NewUserHandler(userClient)
+	walletClient := walletv1.NewWalletServiceClient(walletServiceConn)
+	userHandler := handler.NewUserHandler(userClient, walletClient, logger)
 	tokenVerifier := jwtauth.NewVerifier(cfg.JWTSecret)
 	router := httpserver.NewRouter(userHandler, middleware.RequireAuth(tokenVerifier))
 
@@ -76,7 +85,7 @@ func run(logger *slog.Logger) error {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		logger.Info("http server listening", "port", cfg.HTTPPort, "user_service_addr", cfg.UserServiceAddr)
+		logger.Info("http server listening", "port", cfg.HTTPPort, "user_service_addr", cfg.UserServiceAddr, "wallet_service_addr", cfg.WalletServiceAddr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serveErr <- err
 			return

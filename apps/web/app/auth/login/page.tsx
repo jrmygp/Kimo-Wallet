@@ -13,7 +13,7 @@ import { loginValidation } from "@/features/auth/schemas/login.schema";
 import { useLoginMutation } from "@/features/auth/hooks/use-login-mutation";
 import { useRouter } from "next/navigation";
 import { useAppDispatch } from "@/lib/store/hooks";
-import { setUser } from "@/features/auth/store/user-slice";
+import { setUser, setBalance } from "@/features/auth/store/user-slice";
 import { useEffect } from "react";
 import { useAppSelector } from "@/lib/store/hooks";
 
@@ -24,11 +24,18 @@ const LoginPage = () => {
   const dispatch = useAppDispatch();
   const loginMutation = useLoginMutation();
   const userData = useAppSelector((state) => state.user);
+  // Set by the register page on a successful registration (redirecting
+  // here, since Register no longer starts a session — see api-gateway's
+  // Register handler) and, symmetrically, by this page itself below when
+  // it redirects to /auth/register on "user not found". Same key/format
+  // both ways round.
+  const phoneNumberArr = localStorage.getItem("phoneNumber")?.split("-") ?? [];
 
   const formik = useFormik({
+    enableReinitialize: true,
     initialValues: {
-      country: "ID",
-      number: "",
+      country: phoneNumberArr[0] ?? "ID",
+      number: phoneNumberArr[1] ?? "",
     },
     validationSchema: loginValidation,
     onSubmit: (values) => {
@@ -42,8 +49,10 @@ const LoginPage = () => {
 
       loginMutation.mutate(phoneNumber, {
         onSuccess: (data) => {
+          localStorage.removeItem("phoneNumber");
           localStorage.setItem("token", data.accessToken);
           dispatch(setUser(data.user));
+          dispatch(setBalance(data.wallet));
           router.push("/home");
         },
         onError: (error) => {
@@ -61,7 +70,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (userData.user?.id) {
-      router.push("/home")
+      router.push("/home");
     }
   }, [userData.user?.id]);
 

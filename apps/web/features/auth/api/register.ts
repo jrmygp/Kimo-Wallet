@@ -1,11 +1,11 @@
 import { AxiosError } from "axios";
 import { AxiosInstance } from "@/lib/axios";
 import { apiEnvelopeSchema } from "@/lib/api-envelope";
-import { userResponseSchema, type UserResponseData } from "@/features/auth/schemas/user-response.schema";
+import { registerResponseSchema, type RegisterResponseData } from "@/features/auth/schemas/user-response.schema";
 
-const registerEnvelopeSchema = apiEnvelopeSchema(userResponseSchema);
+const registerEnvelopeSchema = apiEnvelopeSchema(registerResponseSchema);
 
-export async function registerUser(phoneNumber: string, fullName: string): Promise<UserResponseData> {
+export async function registerUser(phoneNumber: string, fullName: string): Promise<RegisterResponseData> {
   try {
     const raw: unknown = await AxiosInstance.post("/v1/auth/register", { phoneNumber, fullName });
     const envelope = await registerEnvelopeSchema.validate(raw);
