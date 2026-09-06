@@ -9,10 +9,10 @@ import (
 )
 
 type stubWalletRepository struct {
-	createErr      error
-	createdWallet  domain.Wallet
-	existingWallet domain.Wallet
-	getByUserIDErr error
+	createErr            error
+	createdWallet        domain.Wallet
+	existingWallet       domain.Wallet
+	getWalletByUserIDErr error
 	// createCalls records every userID Create was called with.
 	createCalls []string
 }
@@ -25,9 +25,9 @@ func (s *stubWalletRepository) Create(ctx context.Context, id, userID string) (d
 	return s.createdWallet, nil
 }
 
-func (s *stubWalletRepository) GetByUserID(ctx context.Context, userID string) (domain.Wallet, error) {
-	if s.getByUserIDErr != nil {
-		return domain.Wallet{}, s.getByUserIDErr
+func (s *stubWalletRepository) GetWalletByUserID(ctx context.Context, userID string) (domain.Wallet, error) {
+	if s.getWalletByUserIDErr != nil {
+		return domain.Wallet{}, s.getWalletByUserIDErr
 	}
 	return s.existingWallet, nil
 }

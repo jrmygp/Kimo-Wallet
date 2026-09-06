@@ -13,7 +13,7 @@ import (
 // WalletRepository persists Wallet records.
 type WalletRepository interface {
 	Create(ctx context.Context, id, userID string) (domain.Wallet, error)
-	GetByUserID(ctx context.Context, userID string) (domain.Wallet, error)
+	GetWalletByUserID(ctx context.Context, userID string) (domain.Wallet, error)
 }
 
 type WalletService struct {
@@ -43,7 +43,20 @@ func (s *WalletService) CreateWallet(ctx context.Context, userID string) (domain
 		return wallet, nil
 	}
 	if errors.Is(err, domain.ErrWalletAlreadyExists) {
-		return s.repo.GetByUserID(ctx, userID)
+		return s.repo.GetWalletByUserID(ctx, userID)
 	}
 	return domain.Wallet{}, err
+}
+
+func (s *WalletService) GetWalletByUserID(ctx context.Context, userID string) (domain.Wallet, error) {
+	validatedUserId, err := domain.NewGetWalletByUserIDInput(userID)
+	if err != nil {
+		return domain.Wallet{}, err
+	}
+	wallet, err := s.repo.GetWalletByUserID(ctx, validatedUserId)
+	if err != nil {
+		return domain.Wallet{}, err
+	}
+
+	return wallet, nil
 }

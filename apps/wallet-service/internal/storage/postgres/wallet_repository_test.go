@@ -116,12 +116,12 @@ func TestWalletRepository_GetByUserID(t *testing.T) {
 		t.Fatalf("Create() error = %v, want nil", err)
 	}
 
-	got, err := repo.GetByUserID(ctx, userID)
+	got, err := repo.GetWalletByUserID(ctx, userID)
 	if err != nil {
-		t.Fatalf("GetByUserID() error = %v, want nil", err)
+		t.Fatalf("GetWalletByUserID() error = %v, want nil", err)
 	}
 	if got != created {
-		t.Fatalf("GetByUserID() = %+v, want %+v", got, created)
+		t.Fatalf("GetWalletByUserID() = %+v, want %+v", got, created)
 	}
 }
 
@@ -129,8 +129,8 @@ func TestWalletRepository_GetByUserID_NotFound(t *testing.T) {
 	db := newTestDB(t)
 	repo := NewWalletRepository(db)
 
-	_, err := repo.GetByUserID(context.Background(), "00000000-0000-0000-0000-000000000000")
+	_, err := repo.GetWalletByUserID(context.Background(), "00000000-0000-0000-0000-000000000000")
 	if !errors.Is(err, domain.ErrWalletNotFound) {
-		t.Fatalf("GetByUserID() error = %v, want %v", err, domain.ErrWalletNotFound)
+		t.Fatalf("GetWalletByUserID() error = %v, want %v", err, domain.ErrWalletNotFound)
 	}
 }

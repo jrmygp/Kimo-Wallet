@@ -82,8 +82,8 @@ func (r *WalletRepository) Create(ctx context.Context, id, userID string) (domai
 	}, nil
 }
 
-// GetByUserID looks up the wallet belonging to userID.
-func (r *WalletRepository) GetByUserID(ctx context.Context, userID string) (domain.Wallet, error) {
+// GetWalletByUserID looks up the wallet belonging to userID.
+func (r *WalletRepository) GetWalletByUserID(ctx context.Context, userID string) (domain.Wallet, error) {
 	var row walletModel
 
 	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&row).Error; err != nil {

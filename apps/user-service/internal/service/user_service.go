@@ -114,12 +114,12 @@ func (s *UserService) Login(ctx context.Context, phoneNumber string) (domain.Use
 // from a real infrastructure failure), or domain.ErrUserNotFound if it's
 // well-formed but no such user exists.
 func (s *UserService) GetUserByID(ctx context.Context, kimoID string) (domain.User, error) {
-	kimoID, err := domain.NewGetUserByKimoIDInput(kimoID)
+	validatedKimoID, err := domain.NewGetUserByKimoIDInput(kimoID)
 	if err != nil {
 		return domain.User{}, err
 	}
 
-	user, err := s.repo.GetUserByID(ctx, kimoID)
+	user, err := s.repo.GetUserByID(ctx, validatedKimoID)
 	if err != nil {
 		return domain.User{}, err
 	}

@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	GRPCPort           string
 	DatabaseURL        string
 	KafkaBrokers       []string
 	KafkaConsumerGroup string
@@ -20,6 +21,11 @@ func Load() (Config, error) {
 	databaseURL := os.Getenv("WALLET_SERVICE_DATABASE_URL")
 	if databaseURL == "" {
 		return Config{}, fmt.Errorf("WALLET_SERVICE_DATABASE_URL is required")
+	}
+
+	grpcPort := os.Getenv("WALLET_SERVICE_GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "50052"
 	}
 
 	// Soft-defaulted, same reasoning as user-service's KafkaBrokers: the
@@ -38,6 +44,7 @@ func Load() (Config, error) {
 	}
 
 	return Config{
+		GRPCPort:           grpcPort,
 		DatabaseURL:        databaseURL,
 		KafkaBrokers:       strings.Split(kafkaBrokers, ","),
 		KafkaConsumerGroup: kafkaConsumerGroup,

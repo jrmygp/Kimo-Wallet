@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
 
+	walletv1 "github.com/jrmygp/kimo-wallet/apps/wallet-service/gen/wallet/v1"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/config"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/eventconsumer"
+	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/grpcserver"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/kafkaconsumer"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/kafkaproducer"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/service"
@@ -75,6 +79,7 @@ func run(logger *slog.Logger) error {
 
 	repo := postgres.NewWalletRepository(db)
 	walletService := service.NewWalletService(repo)
+	walletServer := grpcserver.NewWalletServer(walletService)
 
 	consumer := kafkaconsumer.New(cfg.KafkaBrokers, cfg.KafkaConsumerGroup, userCreatedTopic)
 	defer func() {
@@ -93,10 +98,32 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	handler := eventconsumer.NewHandler(consumer, walletService, deadLetterProducer, logger)
+	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
+	if err != nil {
+		return err
+	}
 
-	logger.Info("consuming", "topic", userCreatedTopic, "group", cfg.KafkaConsumerGroup)
-	handler.Run(ctx)
-	logger.Info("shutdown signal received, stopped consuming")
-	return nil
+	grpcServer := grpc.NewServer()
+	walletv1.RegisterWalletServiceServer(grpcServer, walletServer)
+
+	serveErr := make(chan error, 1)
+	go func() {
+		logger.Info("grpc server listening", "port", cfg.GRPCPort)
+		serveErr <- grpcServer.Serve(listener)
+	}()
+
+	handler := eventconsumer.NewHandler(consumer, walletService, deadLetterProducer, logger)
+	go func() {
+		logger.Info("consuming", "topic", userCreatedTopic, "group", cfg.KafkaConsumerGroup)
+		handler.Run(ctx)
+	}()
+
+	select {
+	case err := <-serveErr:
+		return err
+	case <-ctx.Done():
+		logger.Info("consuming", "topic", userCreatedTopic, "group", cfg.KafkaConsumerGroup)
+		logger.Info("shutdown signal received, stopped consuming")
+		return nil
+	}
 }

@@ -2,6 +2,8 @@ package domain
 
 import (
 	"errors"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -14,7 +16,10 @@ var (
 	// wallet — see internal/service's WalletService.CreateWallet.
 	ErrWalletAlreadyExists = errors.New("wallet already exists for this user")
 	ErrWalletNotFound      = errors.New("wallet not found")
+	ErrInvalidUserID       = errors.New("invalid user id format")
 )
+
+var userIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // Wallet is the identity record owned by the Wallet Service for a single
 // user's balance. Balance is integer minor units (e.g. rupiah), never a
@@ -26,4 +31,13 @@ type Wallet struct {
 	Currency  string
 	Status    string
 	CreatedAt time.Time
+}
+
+func NewGetWalletByUserIDInput(userID string) (string, error) {
+	userID = strings.TrimSpace(userID)
+	if !userIDPattern.MatchString(userID) {
+		return "", ErrInvalidUserID
+	}
+
+	return userID, nil
 }
