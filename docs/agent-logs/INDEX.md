@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-09-06 — Entry 1 — [Dead-letter topic for wallet-service's user.created consumer](2026-09-06.md) — apps/wallet-service, apps/user-service — money:no — completed
 - 2026-09-05 — Entry 4 — [wallet-service consumes user.created and creates wallets (Phase 3 of 3)](2026-09-05.md) — docker-compose.yml, .env, .env.example, apps/wallet-service — money:no — completed
 - 2026-09-05 — Entry 3 — [user-service publishes user.created (Phase 2 of 3: transactional outbox + Kafka producer)](2026-09-05.md) — packages/contracts, apps/user-service — money:no — completed
 - 2026-09-05 — Entry 2 — [Codify "never `docker compose down -v`" in the mandatory rules](2026-09-05.md) — docs — money:no — completed

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -28,13 +29,49 @@ type WalletService interface {
 	CreateWallet(ctx context.Context, userID string) (domain.Wallet, error)
 }
 
+// DeadLetterPublisher is the subset of a Kafka producer this handler
+// needs — satisfied by kafkaproducer.Producer. A message that never
+// succeeds is published here, value untouched, before its original
+// offset is committed — see processWithRetry.
+type DeadLetterPublisher interface {
+	Publish(ctx context.Context, topic string, key, value []byte, headers map[string]string) error
+}
+
+// deadLetterTopicSuffix turns the original topic into its dead-letter
+// counterpart — "user.created" -> "user.created.dlq". One suffix,
+// applied to whatever topic this Handler happens to be consuming, so it
+// isn't hardcoded to "user.created" specifically.
+const deadLetterTopicSuffix = ".dlq"
+
+// Header keys on a dead-lettered message. The message's own Value is
+// left byte-for-byte identical to the original — these headers carry
+// only the diagnostic context, so a human (or a future replay tool) can
+// see why it failed without needing to unwrap anything to get the
+// original payload back.
+const (
+	headerOriginalTopic     = "x-original-topic"
+	headerOriginalPartition = "x-original-partition"
+	headerOriginalOffset    = "x-original-offset"
+	headerFailedAt          = "x-failed-at"
+	headerAttempts          = "x-attempts"
+	headerError             = "x-error"
+)
+
 // maxProcessAttempts bounds retry of one message before giving up on it
-// — never an infinite *tight* loop (docs/CLAUDE.md §3.6 rule 3). There's
-// no dead-letter *topic* yet — "giving up" means a loud log and moving
-// on to the next message, not blocking the whole partition behind one
-// bad event forever. That's a real gap, not a silent one — see this
-// day's log entry.
+// and dead-lettering it — never an infinite *tight* loop (docs/CLAUDE.md
+// §3.6 rule 3).
 const maxProcessAttempts = 5
+
+// maxDeadLetterPublishAttempts bounds retry of the dead-letter publish
+// itself, separately from maxProcessAttempts. Found live: a dead-letter
+// topic's very first publish reliably fails with "Unknown Topic Or
+// Partition" even with the producer's AllowAutoTopicCreation set — the
+// broker starts creating the topic as a side effect of that first
+// request, but creation isn't synchronous with it, so that same request
+// still reports the topic missing. A short retry clears this on the
+// first dead-letter ever sent to a given topic; every one after that
+// succeeds on the first attempt, since the topic already exists by then.
+const maxDeadLetterPublishAttempts = 3
 
 // defaultRetryBackoff is NewHandler's production value. A field, not a
 // baked-in constant used directly in Run/processWithRetry, specifically
@@ -46,12 +83,13 @@ const defaultRetryBackoff = 2 * time.Second
 type Handler struct {
 	reader       Reader
 	wallets      WalletService
+	deadLetter   DeadLetterPublisher
 	logger       *slog.Logger
 	retryBackoff time.Duration
 }
 
-func NewHandler(reader Reader, wallets WalletService, logger *slog.Logger) *Handler {
-	return &Handler{reader: reader, wallets: wallets, logger: logger, retryBackoff: defaultRetryBackoff}
+func NewHandler(reader Reader, wallets WalletService, deadLetter DeadLetterPublisher, logger *slog.Logger) *Handler {
+	return &Handler{reader: reader, wallets: wallets, deadLetter: deadLetter, logger: logger, retryBackoff: defaultRetryBackoff}
 }
 
 // Run fetches and processes messages one at a time until ctx is
@@ -91,15 +129,50 @@ func (h *Handler) processWithRetry(ctx context.Context, msg kafka.Message) {
 	}
 
 	if lastErr != nil {
-		h.logger.Error("giving up on event after max attempts — skipping, not dead-lettering (known gap)",
+		h.logger.Error("giving up on event after max attempts, dead-lettering",
 			"attempts", maxProcessAttempts, "offset", msg.Offset, "error", lastErr.Error())
+		h.deadLetterOrLog(ctx, msg, lastErr)
 	}
 
-	// Committed either way: a message that fails forever must not block
-	// every message behind it in the same partition.
+	// Committed either way: a message that fails forever (dead-lettered
+	// or not) must not block every message behind it in the same partition.
 	if err := h.reader.CommitMessages(ctx, msg); err != nil {
 		h.logger.Error("commit kafka message", "error", err.Error(), "offset", msg.Offset)
 	}
+}
+
+// deadLetterOrLog publishes msg, value untouched, to its dead-letter
+// topic — see the header constants above for what travels alongside it.
+// If the dead-letter publish itself fails (e.g. Kafka briefly
+// unreachable at that exact moment), that's logged loudly and the
+// original message is still committed regardless: the alternative is
+// blocking the whole partition indefinitely on a publish that may never
+// succeed, which is worse than the rare double failure this accepts.
+func (h *Handler) deadLetterOrLog(ctx context.Context, msg kafka.Message, processErr error) {
+	headers := map[string]string{
+		headerOriginalTopic:     msg.Topic,
+		headerOriginalPartition: strconv.Itoa(msg.Partition),
+		headerOriginalOffset:    strconv.FormatInt(msg.Offset, 10),
+		headerFailedAt:          time.Now().UTC().Format(time.RFC3339),
+		headerAttempts:          strconv.Itoa(maxProcessAttempts),
+		headerError:             processErr.Error(),
+	}
+
+	dlqTopic := msg.Topic + deadLetterTopicSuffix
+
+	var publishErr error
+	for attempt := 1; attempt <= maxDeadLetterPublishAttempts; attempt++ {
+		publishErr = h.deadLetter.Publish(ctx, dlqTopic, msg.Key, msg.Value, headers)
+		if publishErr == nil {
+			return
+		}
+		if attempt < maxDeadLetterPublishAttempts {
+			time.Sleep(h.retryBackoff)
+		}
+	}
+
+	h.logger.Error("publish to dead-letter topic failed after retries — message content will only be recoverable from the original topic's own retention, if any",
+		"dlq_topic", dlqTopic, "offset", msg.Offset, "error", publishErr.Error())
 }
 
 func (h *Handler) process(ctx context.Context, msg kafka.Message) error {

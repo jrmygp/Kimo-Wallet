@@ -20,6 +20,14 @@ func New(brokers []string) *Producer {
 		writer: &kafka.Writer{
 			Addr:     kafka.TCP(brokers...),
 			Balancer: &kafka.LeastBytes{},
+			// Without this, kafka-go treats "topic doesn't exist yet" as a
+			// hard error rather than asking the broker to create it. This
+			// service's outbox relay retries every 2s regardless, so the
+			// symptom self-healed silently here — but it's the same latent
+			// gap found live in wallet-service's dead-letter producer,
+			// which only publishes once per message and doesn't get that
+			// same free retry.
+			AllowAutoTopicCreation: true,
 		},
 	}
 }

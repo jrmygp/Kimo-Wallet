@@ -15,6 +15,7 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/config"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/eventconsumer"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/kafkaconsumer"
+	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/kafkaproducer"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/service"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/storage/postgres"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/migrations"
@@ -82,7 +83,17 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	handler := eventconsumer.NewHandler(consumer, walletService, logger)
+	// Same broker list as the consumer — this producer only ever writes
+	// to <topic>.dlq when Handler gives up on a message, see
+	// internal/eventconsumer's Handler.deadLetterOrLog.
+	deadLetterProducer := kafkaproducer.New(cfg.KafkaBrokers)
+	defer func() {
+		if err := deadLetterProducer.Close(); err != nil {
+			logger.Error("close dead-letter kafka producer", "error", err.Error())
+		}
+	}()
+
+	handler := eventconsumer.NewHandler(consumer, walletService, deadLetterProducer, logger)
 
 	logger.Info("consuming", "topic", userCreatedTopic, "group", cfg.KafkaConsumerGroup)
 	handler.Run(ctx)
