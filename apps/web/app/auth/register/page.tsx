@@ -46,6 +46,11 @@ const RegisterPage = () => {
             localStorage.setItem("phoneNumber", `${values.country}-${values.number}`);
             router.push("/auth/login");
           },
+          onError(error) {
+            if (error.message === "phone number is already registered") {
+              formik.setFieldError("number", error.message);
+            }
+          },
         },
       );
     },

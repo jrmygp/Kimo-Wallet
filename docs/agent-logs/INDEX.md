@@ -18,6 +18,8 @@ Rules:
 
 ## Entries
 
+- 2026-09-13 — Entry 2 — [New apps/service-template for bootstrapping future backend services](2026-09-13.md) — apps/service-template — money:no — completed
+- 2026-09-13 — Entry 1 — [Fix unreachable auto-logout condition; add real route protection](2026-09-13.md) — apps/web — money:no — completed
 - 2026-09-06 — Entry 4 — [Register no longer starts a session; frontend redirects to Login instead](2026-09-06.md) — apps/api-gateway, apps/web — money:no — completed
 - 2026-09-06 — Entry 3 — [Login now also includes the caller's own wallet balance](2026-09-06.md) — apps/api-gateway — money:no — completed
 - 2026-09-06 — Entry 2 — [api-gateway aggregates wallet balance into GetUserByID (own profile only)](2026-09-06.md) — apps/api-gateway — money:no — completed
