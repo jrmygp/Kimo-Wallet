@@ -1,5 +1,5 @@
 // Package service orchestrates id generation, input validation, and
-// persistence for widgets — the layer grpcserver calls into and
+// persistence for transactions — the layer grpcserver calls into and
 // storage/postgres implements against.
 package service
 
@@ -10,6 +10,8 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/domain"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/idgen"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	walletv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/wallet/v1"
 )
@@ -32,16 +34,35 @@ func NewTransactionService(repo TransactionRepository, wallet WalletServiceClien
 }
 
 func (s *TransactionService) CreateTransaction(ctx context.Context, request domain.TransactionRequest) (domain.Transaction, error) {
-	if senderWallet, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.SenderUserID}); err != nil {
+	validated, err := domain.NewTransactionRequest(
+		request.IdempotencyKey,
+		request.SenderUserID,
+		request.SenderWalletID,
+		request.ReceiverUserID,
+		request.ReceiverWalletID,
+		request.Currency,
+		request.Amount,
+	)
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	request = validated
+
+	// GetWalletByUserID returns an error (codes.NotFound) on a missing
+	// wallet — it never succeeds with a nil Wallet — so NotFound must be
+	// read off the error itself, not the response.
+	if _, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.SenderUserID}); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return domain.Transaction{}, domain.ErrSenderNotFound
+		}
 		return domain.Transaction{}, fmt.Errorf("sender wallet lookup: %w", err)
-	} else if senderWallet.Wallet == nil {
-		return domain.Transaction{}, domain.ErrSenderNotFound
 	}
 
-	if receiverWallet, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.ReceiverUserID}); err != nil {
+	if _, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.ReceiverUserID}); err != nil {
+		if status.Code(err) == codes.NotFound {
+			return domain.Transaction{}, domain.ErrReceiverNotFound
+		}
 		return domain.Transaction{}, fmt.Errorf("receiver wallet lookup: %w", err)
-	} else if receiverWallet.Wallet == nil {
-		return domain.Transaction{}, domain.ErrReceiverNotFound
 	}
 
 	id, err := idgen.NewV4()

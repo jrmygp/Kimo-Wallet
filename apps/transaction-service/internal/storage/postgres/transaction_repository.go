@@ -13,7 +13,12 @@ import (
 )
 
 const pgUniqueViolation = "23505"
-const uniqueIdempotencyKeyConstraint = "transactions_idempotency_key_key"
+const uniqueIdempotencyKeyConstraint = "transactions_idempotency_key_sender_user_id_key"
+
+// statusPending is the status a transaction is created with. Not exported
+// beyond this package yet — nothing here transitions it further; see
+// docs/CLAUDE.md §3.5 for the full state machine this will eventually need.
+const statusPending = "PENDING"
 
 type transactionModel struct {
 	ID               string `gorm:"primaryKey"`
@@ -51,7 +56,7 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 		ReceiverWalletID: request.ReceiverWalletID,
 		Currency:         request.Currency,
 		Amount:           request.Amount,
-		Status:           "Pending",
+		Status:           statusPending,
 	}
 
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {

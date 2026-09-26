@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -50,15 +51,26 @@ func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transact
 		Amount:           req.Amount,
 	})
 	if err != nil {
-		// TODO: no transaction-specific sentinel errors exist yet (no
-		// domain-level amount/sender/receiver validation, no typed
-		// idempotency-conflict error from the repository's unique
-		// constraint) — everything maps to Internal for now. Once those
-		// exist, switch on them here the same way wallet_server.go does
-		// (e.g. codes.InvalidArgument for a bad amount, codes.AlreadyExists
-		// or similar for a replayed idempotency key with a different body —
-		// see docs/CLAUDE.md §3.2 rule 5).
-		return nil, status.Error(codes.Internal, "failed to create transaction")
+		switch {
+		case errors.Is(err, domain.ErrInvalidIdempotencyKey),
+			errors.Is(err, domain.ErrInvalidID),
+			errors.Is(err, domain.ErrSenderIsReceiver),
+			errors.Is(err, domain.ErrInvalidAmount),
+			errors.Is(err, domain.ErrInvalidCurrency):
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		case errors.Is(err, domain.ErrSenderNotFound), errors.Is(err, domain.ErrReceiverNotFound):
+			return nil, status.Error(codes.NotFound, err.Error())
+		case errors.Is(err, domain.ErrIdempotencyConflict):
+			// A repeated idempotency key should really return the
+			// *original* transaction's result, not an error at all (see
+			// docs/CLAUDE.md §3.2 rule 4) — that lookup doesn't exist yet
+			// (no TransactionRepository.GetByIdempotencyKey), so this is a
+			// conservative placeholder: better to reject the retry loudly
+			// than to silently create a duplicate.
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, "failed to create transaction")
+		}
 	}
 
 	return &transactionv1.CreateTransactionResponse{Transaction: toProtoTransaction(transaction)}, nil

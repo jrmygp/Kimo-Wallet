@@ -18,6 +18,8 @@ Rules:
 
 ## Entries
 
+- 2026-09-26 — Entry 1 — [transaction-service: fix everything found in a full scan except test coverage](2026-09-26.md) — apps/transaction-service, root .env/.env.example, packages/contracts/transaction — money:no — completed
+
 - 2026-09-13 — Entry 2 — [New apps/service-template for bootstrapping future backend services](2026-09-13.md) — apps/service-template — money:no — completed
 - 2026-09-13 — Entry 1 — [Fix unreachable auto-logout condition; add real route protection](2026-09-13.md) — apps/web — money:no — completed
 - 2026-09-06 — Entry 4 — [Register no longer starts a session; frontend redirects to Login instead](2026-09-06.md) — apps/api-gateway, apps/web — money:no — completed

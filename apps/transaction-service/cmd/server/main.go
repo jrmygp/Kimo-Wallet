@@ -24,8 +24,6 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/migrations"
 )
 
-// TEMPLATE NOTE: rename this and everywhere it's used to your service's
-// real name — see README.md.
 const serviceName = "transaction-service"
 
 func main() {
@@ -71,14 +69,12 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("migrations applied")
 
-	// User service grpc connection
-	// userServiceConn, err := grpc.NewClient(cfg.UserServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	// if err != nil {
-	// 	return fmt.Errorf("connect to user-service: %w", err)
-	// }
-	// defer userServiceConn.Close()
-
-	// Wallet service grpc connection
+	// Wallet service grpc connection — used to confirm the sender/receiver
+	// actually have a wallet before creating a transaction (see
+	// internal/service/transaction_service.go). No separate connection to
+	// user-service: a wallet can only exist for a real user (created via
+	// wallet-service's user.created consumer), so a successful wallet
+	// lookup already proves the user exists too.
 	walletServiceConn, err := grpc.NewClient(cfg.WalletServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("connect to wallet-service: %w", err)

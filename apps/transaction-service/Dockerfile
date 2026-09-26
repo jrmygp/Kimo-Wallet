@@ -3,10 +3,10 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /out/service-template ./cmd/server
+RUN CGO_ENABLED=0 go build -o /out/transaction-service ./cmd/server
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
-COPY --from=build /out/service-template /usr/local/bin/service-template
+COPY --from=build /out/transaction-service /usr/local/bin/transaction-service
 EXPOSE 50053
-ENTRYPOINT ["/usr/local/bin/service-template"]
+ENTRYPOINT ["/usr/local/bin/transaction-service"]
