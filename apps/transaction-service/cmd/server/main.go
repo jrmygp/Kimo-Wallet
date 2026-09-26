@@ -15,17 +15,18 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	widgetv1 "github.com/jrmygp/kimo-wallet/apps/service-template/gen/widget/v1"
-	"github.com/jrmygp/kimo-wallet/apps/service-template/internal/config"
-	"github.com/jrmygp/kimo-wallet/apps/service-template/internal/grpcserver"
-	"github.com/jrmygp/kimo-wallet/apps/service-template/internal/service"
-	"github.com/jrmygp/kimo-wallet/apps/service-template/internal/storage/postgres"
-	"github.com/jrmygp/kimo-wallet/apps/service-template/migrations"
+	transactionv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/transaction/v1"
+	walletv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/wallet/v1"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/config"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/grpcserver"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/service"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/storage/postgres"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/migrations"
 )
 
 // TEMPLATE NOTE: rename this and everywhere it's used to your service's
 // real name — see README.md.
-const serviceName = "service-template"
+const serviceName = "transaction-service"
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", serviceName)
@@ -70,9 +71,25 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("migrations applied")
 
+	// User service grpc connection
+	// userServiceConn, err := grpc.NewClient(cfg.UserServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// if err != nil {
+	// 	return fmt.Errorf("connect to user-service: %w", err)
+	// }
+	// defer userServiceConn.Close()
+
+	// Wallet service grpc connection
+	walletServiceConn, err := grpc.NewClient(cfg.WalletServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("connect to wallet-service: %w", err)
+	}
+	defer walletServiceConn.Close()
+
+	walletClient := walletv1.NewWalletServiceClient(walletServiceConn)
+
 	repo := postgres.NewTransactionRepository(db)
-	transactionService := service.NewTransactionService(repo)
-	widgetServer := grpcserver.NewWidgetServer(transactionService)
+	transactionService := service.NewTransactionService(repo, walletClient)
+	transactionServer := grpcserver.NewTransactionServer(transactionService)
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
@@ -80,14 +97,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	grpcServer := grpc.NewServer()
-	widgetv1.RegisterWidgetServiceServer(grpcServer, widgetServer)
-
-	// User service grpc connection
-	userServiceConn, err := grpc.NewClient(cfg.UserServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return fmt.Errorf("connect to user-service: %w", err)
-	}
-	defer userServiceConn.Close()
+	transactionv1.RegisterTransactionServiceServer(grpcServer, transactionServer)
 
 	serveErr := make(chan error, 1)
 	go func() {

@@ -10,20 +10,14 @@ package domain
 
 import (
 	"errors"
-	"regexp"
 	"time"
 )
 
 var (
-	ErrWidgetNotFound = errors.New("widget not found")
-	ErrInvalidID      = errors.New("id must be a valid uuid")
-	ErrInvalidName    = errors.New("name must be between 1 and 100 characters")
+	ErrSenderNotFound      = errors.New("User sender not found")
+	ErrReceiverNotFound    = errors.New("User receiver not found")
+	ErrIdempotencyConflict = errors.New("idempotency key conflict")
 )
-
-// idPattern matches a v4 UUID as produced by internal/idgen.NewV4.
-var idPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-
-const maxNameLength = 100
 
 type Transaction struct {
 	ID               string

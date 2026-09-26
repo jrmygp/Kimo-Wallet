@@ -2,13 +2,18 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/domain"
 )
+
+const pgUniqueViolation = "23505"
+const uniqueIdempotencyKeyConstraint = "transactions_idempotency_key_key"
 
 type transactionModel struct {
 	ID               string `gorm:"primaryKey"`
@@ -50,6 +55,10 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 	}
 
 	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == uniqueIdempotencyKeyConstraint {
+			return domain.Transaction{}, domain.ErrIdempotencyConflict
+		}
 		return domain.Transaction{}, fmt.Errorf("insert transaction: %w", err)
 	}
 

@@ -11,9 +11,10 @@ import (
 )
 
 type Config struct {
-	GRPCPort        string
-	DatabaseURL     string
-	UserServiceAddr string
+	GRPCPort          string
+	DatabaseURL       string
+	UserServiceAddr   string
+	WalletServiceAddr string
 }
 
 // Load reads configuration from environment variables, failing fast if a
@@ -30,14 +31,20 @@ func Load() (Config, error) {
 		grpcPort = "50053"
 	}
 
-	userServiceAddr := os.Getenv("USER_SERVICE_GRPC_ADDR")
-	if userServiceAddr == "" {
-		return Config{}, fmt.Errorf("USER_SERVICE_GRPC_ADDR is required")
+	// userServiceAddr := os.Getenv("USER_SERVICE_GRPC_ADDR")
+	// if userServiceAddr == "" {
+	// 	return Config{}, fmt.Errorf("USER_SERVICE_GRPC_ADDR is required")
+	// }
+
+	walletServiceAddr := os.Getenv("WALLET_SERVICE_GRPC_ADDR")
+	if walletServiceAddr == "" {
+		return Config{}, fmt.Errorf("WALLET_SERVICE_GRPC_ADDR is required")
 	}
 
 	return Config{
-		GRPCPort:        grpcPort,
-		DatabaseURL:     databaseURL,
-		UserServiceAddr: userServiceAddr,
+		GRPCPort:    grpcPort,
+		DatabaseURL: databaseURL,
+		// UserServiceAddr:   userServiceAddr,
+		WalletServiceAddr: walletServiceAddr,
 	}, nil
 }
