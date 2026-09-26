@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package transaction.v1;
+
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/transaction/v1;transactionv1";
+
+message Transaction {
+  string id = 1;
+  string user_id = 2;
+  string wallet_id = 3;
+  int64 amount = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateTransactionRequest {
+  string user_id = 1;
+  string wallet_id = 2;
+  int64 amount = 3;
+  string kimo_id = 4;
+}
+
+message CreateTransactionResponse {
+  string user_id = 2;
+  string wallet_id = 3;
+  int64 amount = 4;
+}
+
+service TransactionService {
+  rpc CreateTransaction(CreateTransactionRequest) returns (CreateTransactionResponse);
+}

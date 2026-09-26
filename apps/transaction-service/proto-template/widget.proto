@@ -1,0 +1,42 @@
+// TEMPLATE NOTE: this file is a starting point, not something buf can
+// generate from where it sits. Move it to
+// packages/contracts/<your-service>/v1/<your-service>.proto, rename the
+// package/messages/go_package below to match, then follow README.md's
+// codegen step. Verified once against a real buf generate + go build by
+// the session that created this template — see docs/agent-logs.
+
+syntax = "proto3";
+
+package widget.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/jrmygp/kimo-wallet/apps/service-template/gen/widget/v1;widgetv1";
+
+message Widget {
+  string id = 1;
+  string name = 2;
+  string status = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message CreateWidgetRequest {
+  string name = 1;
+}
+
+message CreateWidgetResponse {
+  Widget widget = 1;
+}
+
+message GetWidgetByIDRequest {
+  string id = 1;
+}
+
+message GetWidgetByIDResponse {
+  Widget widget = 1;
+}
+
+service WidgetService {
+  rpc CreateWidget(CreateWidgetRequest) returns (CreateWidgetResponse);
+  rpc GetWidgetByID(GetWidgetByIDRequest) returns (GetWidgetByIDResponse);
+}

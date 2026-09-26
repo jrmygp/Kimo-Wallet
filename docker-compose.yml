@@ -36,6 +36,23 @@ services:
       timeout: 5s
       retries: 5
 
+  transaction-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TRANSACTION_DB_USER}
+      POSTGRES_PASSWORD: ${TRANSACTION_DB_PASSWORD}
+      POSTGRES_DB: ${TRANSACTION_DB_NAME}
+    ports:
+      - "${TRANSACTION_DB_PORT}:5432"
+    volumes:
+      - transaction_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TRANSACTION_DB_USER} -d ${TRANSACTION_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # Single-node KRaft-mode Kafka (broker + controller combined, no separate
   # Zookeeper container) — the officially published Apache image, not a
   # third-party one. Go services run natively on the host (go run), same as
@@ -75,4 +92,5 @@ services:
 volumes:
   user_db_data:
   wallet_db_data:
+  transaction_db_data:
   kafka_data:
