@@ -29,6 +29,7 @@ func NewLedgerEntriesRepository(db *gorm.DB) *LedgerEntriesRepository {
 	return &LedgerEntriesRepository{db: db}
 }
 
+// Not used, dead code, but left here for reference. Ledger entries are created in the same transaction as the wallet balance update, so this repository is not used directly.
 func (r *LedgerEntriesRepository) Create(ctx context.Context, entryRequest domain.LedgerEntry) (domain.LedgerEntry, error) {
 	var created domain.LedgerEntry
 

@@ -107,8 +107,31 @@ func (r *WalletRepository) GetWalletByUserID(ctx context.Context, userID string)
 	}, nil
 }
 
-func (r *WalletRepository) ApplyTransfer(ctx context.Context, transactionID string, senderWalletID string, receiverWalletID string, amount int64) (status string, failureReason *string, err error) {
+const (
+	transferStatusCompleted = "COMPLETED"
+	transferStatusFailed    = "FAILED"
+)
+
+// ApplyTransfer debits senderWalletID, credits receiverWalletID, and
+// records the outcome — all in one local transaction, so the balance
+// change, the double-entry ledger rows, and the transaction.processed
+// outbox event either all land or none do (docs/CLAUDE.md §3.3 rule 2/3).
+//
+// "Sender/receiver wallet not found" and "insufficient balance" are
+// business outcomes, not infrastructure errors: each one still writes and
+// commits a FAILED transaction.processed event (via writeOutcome below)
+// rather than aborting the transaction — that event is the only way
+// transaction-service ever learns the transfer didn't go through and
+// moves its own transactions row out of PENDING. Only a genuine
+// infrastructure error (a lock/query/insert actually failing) aborts and
+// rolls back, so the caller retries.
+func (r *WalletRepository) ApplyTransfer(ctx context.Context, transactionID string, senderWalletID string, receiverWalletID string, amount int64, currency string) (status string, failureReason *string, err error) {
 	txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		writeOutcome := func(outcomeStatus string, reason *string) error {
+			status, failureReason = outcomeStatus, reason
+			return r.writeTransactionProcessed(tx, transactionID, outcomeStatus, reason)
+		}
+
 		// Lock both wallets in a deterministic order (ascending id) —
 		// required to avoid deadlocking against a concurrent transfer
 		// running the opposite direction (receiver -> sender), see
@@ -126,18 +149,22 @@ func (r *WalletRepository) ApplyTransfer(ctx context.Context, transactionID stri
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", firstID).First(&first).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				if firstID == senderWalletID {
-					return domain.ErrSenderWalletNotFound
+					reason := "sender wallet not found"
+					return writeOutcome(transferStatusFailed, &reason)
 				}
-				return domain.ErrReceiverWalletNotFound
+				reason := "receiver wallet not found"
+				return writeOutcome(transferStatusFailed, &reason)
 			}
 			return fmt.Errorf("lock wallet %s: %w", firstID, err)
 		}
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", secondID).First(&second).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				if secondID == senderWalletID {
-					return domain.ErrSenderWalletNotFound
+					reason := "sender wallet not found"
+					return writeOutcome(transferStatusFailed, &reason)
 				}
-				return domain.ErrReceiverWalletNotFound
+				reason := "receiver wallet not found"
+				return writeOutcome(transferStatusFailed, &reason)
 			}
 			return fmt.Errorf("lock wallet %s: %w", secondID, err)
 		}
@@ -147,18 +174,9 @@ func (r *WalletRepository) ApplyTransfer(ctx context.Context, transactionID stri
 			senderWallet, receiverWallet = second, first
 		}
 
-		// TODO: continue here, still inside this same tx (the locks above
-		// are only held for the duration of this transaction) — an atomic
-		// conditional debit on senderWallet (balance >= amount, checking
-		// rows-affected for insufficient balance), credit receiverWallet,
-		// insert both ledger_entries rows (DEBIT + CREDIT), and the
-		// outbox event. See docs/plans/transaction-settlement.md Phase 2
-		// step 3.
-		_ = senderWallet
-		_ = receiverWallet
-
 		if senderWallet.Balance < amount {
-			return domain.ErrInsufficientBalance
+			reason := "insufficient balance"
+			return writeOutcome(transferStatusFailed, &reason)
 		}
 
 		newSenderBalance := senderWallet.Balance - amount
@@ -171,80 +189,73 @@ func (r *WalletRepository) ApplyTransfer(ctx context.Context, transactionID stri
 			return fmt.Errorf("update receiver wallet balance: %w", err)
 		}
 
-		// Create ledger entry for debit (sender)
-		ledgerDebitID, err := idgen.NewV4()
+		debitID, err := idgen.NewV4()
 		if err != nil {
 			return fmt.Errorf("generate ledger entry debit id: %w", err)
 		}
-
-		ledgerEntryRow := ledgerEntryModel{
-			ID:            ledgerDebitID,
+		if err := tx.Create(&ledgerEntryModel{
+			ID:            debitID,
 			TransactionID: transactionID,
 			WalletID:      senderWallet.ID,
 			Direction:     "DEBIT",
 			Amount:        amount,
-			Currency:      senderWallet.Currency,
-		}
-
-		if err := tx.Create(&ledgerEntryRow).Error; err != nil {
+			Currency:      currency,
+		}).Error; err != nil {
 			return fmt.Errorf("insert ledger entry debit: %w", err)
 		}
 
-		// Create ledger entry for credit (receiver)
-		ledgerCreditID, err := idgen.NewV4()
+		creditID, err := idgen.NewV4()
 		if err != nil {
 			return fmt.Errorf("generate ledger entry credit id: %w", err)
 		}
-
-		ledgerCreditRow := ledgerEntryModel{
-			ID:            ledgerCreditID,
+		if err := tx.Create(&ledgerEntryModel{
+			ID:            creditID,
 			TransactionID: transactionID,
 			WalletID:      receiverWallet.ID,
 			Direction:     "CREDIT",
 			Amount:        amount,
-			Currency:      receiverWallet.Currency,
-		}
-
-		if err := tx.Create(&ledgerCreditRow).Error; err != nil {
+			Currency:      currency,
+		}).Error; err != nil {
 			return fmt.Errorf("insert ledger entry credit: %w", err)
 		}
 
-		// Create outboxRow
-		eventID, err := idgen.NewV4()
-		if err != nil {
-			return fmt.Errorf("generate outbox event id: %w", err)
-		}
-
-		payload, err := protojson.Marshal(&walletv1.TransactionProcessed{
-			TransactionId: transactionID,
-			Status:        "SUCCESS",
-			FailureReason: nil,
-		})
-
-		outboxRow := outboxEventModel{
-			ID:        eventID,
-			EventType: EventTypeTransactionProcessed,
-			Payload:   payload,
-		}
-		if err := tx.Create(&outboxRow).Error; err != nil {
-			return fmt.Errorf("insert outbox event: %w", err)
-		}
-
-		return nil
+		return writeOutcome(transferStatusCompleted, nil)
 	})
 
 	if txErr != nil {
-		switch {
-		case errors.Is(txErr, domain.ErrSenderWalletNotFound):
-			reason := "sender wallet not found"
-			return "FAILED", &reason, domain.ErrSenderWalletNotFound
-		case errors.Is(txErr, domain.ErrReceiverWalletNotFound):
-			reason := "receiver wallet not found"
-			return "FAILED", &reason, domain.ErrReceiverWalletNotFound
-		default:
-			return "", nil, fmt.Errorf("apply transfer: %w", txErr)
-		}
+		return "", nil, fmt.Errorf("apply transfer: %w", txErr)
 	}
 
-	return "SUCCESS", nil, nil
+	return status, failureReason, nil
+}
+
+// writeTransactionProcessed inserts the outbox event that reports this
+// transfer's outcome back to transaction-service, in the same DB
+// transaction (tx) as whatever it's reporting — so the event can never be
+// lost even if the process dies immediately after this commits (the
+// outbox pattern — docs/CLAUDE.md §3.4 rule 3, docs/plans/transaction-settlement.md).
+func (r *WalletRepository) writeTransactionProcessed(tx *gorm.DB, transactionID, status string, failureReason *string) error {
+	eventID, err := idgen.NewV4()
+	if err != nil {
+		return fmt.Errorf("generate outbox event id: %w", err)
+	}
+
+	payload, err := protojson.Marshal(&walletv1.TransactionProcessed{
+		TransactionId: transactionID,
+		Status:        status,
+		FailureReason: failureReason,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal transaction.processed payload: %w", err)
+	}
+
+	if err := tx.Create(&outboxEventModel{
+		ID:        eventID,
+		EventType: EventTypeTransactionProcessed,
+		Payload:   payload,
+	}).Error; err != nil {
+		return fmt.Errorf("insert outbox event: %w", err)
+	}
+
+	return nil
 }
