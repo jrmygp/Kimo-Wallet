@@ -86,7 +86,7 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 			Currency:         row.Currency,
 		})
 		if err != nil {
-			return fmt.Errorf("marshal transaction.processed payload: %w", err)
+			return fmt.Errorf("marshal transaction.created payload: %w", err)
 		}
 
 		outboxRow := outboxEventModel{
