@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package wallet.v1;
+
+option go_package = "github.com/jrmygp/kimo-wallet/apps/wallet-service/gen/wallet/v1;walletv1";
+
+// TransactionProcessed is published by Wallet Service on the
+// "transaction.processed" Kafka topic after it applies (or fails to
+// apply) a TransactionCreated event — debiting the sender, crediting the
+// receiver, and writing the ledger, all in one local transaction (see
+// docs/plans/transaction-settlement.md). Transaction Service consumes
+// this to move its transactions row to a terminal status.
+message TransactionProcessed {
+  string transaction_id = 1;
+  // "COMPLETED" or "FAILED" — e.g. FAILED when the sender's balance was
+  // insufficient at the moment this was processed.
+  string status = 2;
+  // Set only when status is "FAILED" (e.g. "insufficient balance").
+  optional string failure_reason = 3;
+}

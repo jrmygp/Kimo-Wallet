@@ -17,3 +17,5 @@ apps/*/gen/
 
 # OS / editor
 .DS_Store
+
+docs/plans/

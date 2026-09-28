@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package transaction.v1;
+
+option go_package = "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/transaction/v1;transactionv1";
+
+// TransactionCreated is published by Transaction Service on the
+// "transaction.created" Kafka topic right after CreateTransaction records
+// a transaction with status PENDING (see docs/plans/transaction-settlement.md).
+// Wallet Service consumes this to actually debit the sender's wallet,
+// credit the receiver's, and write the double-entry ledger rows.
+//
+// Deliberately minimal: only what Wallet Service needs to move the
+// balance. sender_user_id/receiver_user_id are not included — their
+// existence was already validated synchronously (via GetWalletByUserID)
+// when CreateTransaction ran; by the time this event fires, only the
+// wallet ids matter.
+message TransactionCreated {
+  string transaction_id = 1;
+  string sender_wallet_id = 2;
+  string receiver_wallet_id = 3;
+  int64 amount = 4;
+  string currency = 5;
+}

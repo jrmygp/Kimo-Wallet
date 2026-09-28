@@ -14,9 +14,12 @@ var (
 	// WalletRepository.Create). Not a failure: this is exactly what makes
 	// a redelivered user.created event a safe no-op instead of a second
 	// wallet — see internal/service's WalletService.CreateWallet.
-	ErrWalletAlreadyExists = errors.New("wallet already exists for this user")
-	ErrWalletNotFound      = errors.New("wallet not found")
-	ErrInvalidUserID       = errors.New("invalid user id format")
+	ErrWalletAlreadyExists    = errors.New("wallet already exists for this user")
+	ErrWalletNotFound         = errors.New("wallet not found")
+	ErrInvalidUserID          = errors.New("invalid user id format")
+	ErrReceiverWalletNotFound = errors.New("receiver wallet not found")
+	ErrSenderWalletNotFound   = errors.New("sender wallet not found")
+	ErrInsufficientBalance    = errors.New("Insufficient balance")
 )
 
 var userIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

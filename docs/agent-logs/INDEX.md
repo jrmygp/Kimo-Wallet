@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-09-28 — Entry 1 — [Design doc: settling a transaction (wallet debit/credit)](2026-09-28.md) — docs/plans — money:yes — completed
 - 2026-09-26 — Entry 1 — [transaction-service: fix everything found in a full scan except test coverage](2026-09-26.md) — apps/transaction-service, root .env/.env.example, packages/contracts/transaction — money:no — completed
 
 - 2026-09-13 — Entry 2 — [New apps/service-template for bootstrapping future backend services](2026-09-13.md) — apps/service-template — money:no — completed
