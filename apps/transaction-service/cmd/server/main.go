@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
@@ -19,12 +20,18 @@ import (
 	walletv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/wallet/v1"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/config"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/grpcserver"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/kafkaproducer"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/outbox"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/service"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/storage/postgres"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/migrations"
 )
 
 const serviceName = "transaction-service"
+
+const transactionProcessedTopic = "transaction.processed"
+
+const outboxRelayInterval = 2 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", serviceName)
@@ -86,6 +93,13 @@ func run(logger *slog.Logger) error {
 	repo := postgres.NewTransactionRepository(db)
 	transactionService := service.NewTransactionService(repo, walletClient)
 	transactionServer := grpcserver.NewTransactionServer(transactionService)
+
+	producer := kafkaproducer.New(cfg.KafkaBrokers)
+
+	outboxRepo := postgres.NewOutboxRepository(db)
+	relay := outbox.NewRelay(outboxRepo, producer, outboxRelayInterval, logger)
+	go relay.Run(ctx)
+	logger.Info("outbox relay started", "interval", outboxRelayInterval.String())
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
