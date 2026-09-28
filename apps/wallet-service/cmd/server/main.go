@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
@@ -20,6 +21,7 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/grpcserver"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/kafkaconsumer"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/kafkaproducer"
+	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/outbox"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/service"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/storage/postgres"
 	"github.com/jrmygp/kimo-wallet/apps/wallet-service/migrations"
@@ -33,6 +35,13 @@ const serviceName = "wallet-service"
 // contract between them, not the .proto (which only defines the
 // message shape, not the topic name).
 const userCreatedTopic = "user.created"
+
+// transactionCreatedTopic must match transaction-service's
+// EventTypeTransactionCreated (once that service publishes it) — same
+// reasoning as userCreatedTopic above.
+const transactionCreatedTopic = "transaction.created"
+
+const outboxRelayInterval = 2 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", serviceName)
@@ -88,6 +97,17 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
+	// Same consumer group as the user.created consumer above — Kafka
+	// tracks committed offsets per (group, topic, partition), so one
+	// logical "wallet-service" group consuming two topics is correct and
+	// simpler than a second group would be.
+	transactionConsumer := kafkaconsumer.New(cfg.KafkaBrokers, cfg.KafkaConsumerGroup, transactionCreatedTopic)
+	defer func() {
+		if err := transactionConsumer.Close(); err != nil {
+			logger.Error("close kafka consumer", "error", err.Error())
+		}
+	}()
+
 	// Same broker list as the consumer — this producer only ever writes
 	// to <topic>.dlq when Handler gives up on a message, see
 	// internal/eventconsumer's Handler.deadLetterOrLog.
@@ -97,6 +117,18 @@ func run(logger *slog.Logger) error {
 			logger.Error("close dead-letter kafka producer", "error", err.Error())
 		}
 	}()
+
+	producer := kafkaproducer.New(cfg.KafkaBrokers)
+	defer func() {
+		if err := producer.Close(); err != nil {
+			logger.Error("close kafka producer", "error", err.Error())
+		}
+	}()
+
+	outboxRepo := postgres.NewOutboxRepository(db)
+	relay := outbox.NewRelay(outboxRepo, producer, outboxRelayInterval, logger)
+	go relay.Run(ctx)
+	logger.Info("outbox relay started", "interval", outboxRelayInterval.String())
 
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
@@ -112,18 +144,23 @@ func run(logger *slog.Logger) error {
 		serveErr <- grpcServer.Serve(listener)
 	}()
 
-	handler := eventconsumer.NewHandler(consumer, walletService, deadLetterProducer, logger)
+	handler := eventconsumer.NewHandler(consumer, eventconsumer.NewUserCreatedProcessor(walletService), deadLetterProducer, logger)
 	go func() {
 		logger.Info("consuming", "topic", userCreatedTopic, "group", cfg.KafkaConsumerGroup)
 		handler.Run(ctx)
+	}()
+
+	transactionHandler := eventconsumer.NewHandler(transactionConsumer, eventconsumer.NewTransactionCreatedProcessor(walletService), deadLetterProducer, logger)
+	go func() {
+		logger.Info("consuming", "topic", transactionCreatedTopic, "group", cfg.KafkaConsumerGroup)
+		transactionHandler.Run(ctx)
 	}()
 
 	select {
 	case err := <-serveErr:
 		return err
 	case <-ctx.Done():
-		logger.Info("consuming", "topic", userCreatedTopic, "group", cfg.KafkaConsumerGroup)
-		logger.Info("shutdown signal received, stopped consuming")
+		logger.Info("shutdown signal received, stopping gracefully")
 		return nil
 	}
 }

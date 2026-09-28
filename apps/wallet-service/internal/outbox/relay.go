@@ -19,9 +19,13 @@ type Repository interface {
 }
 
 // Publisher is the subset of a Kafka client the relay needs — satisfied
-// by kafkaproducer.Producer.
+// by kafkaproducer.Producer. Unlike user-service's equivalent, wallet-
+// service's Producer always takes a headers map (it was built for the
+// dead-letter producer first, where headers carry diagnostic metadata —
+// see docs/agent-logs/2026-09-06.md Entry 1); relayOnce passes nil since
+// a regular outbox event has no headers to attach.
 type Publisher interface {
-	Publish(ctx context.Context, topic string, key, value []byte) error
+	Publish(ctx context.Context, topic string, key, value []byte, headers map[string]string) error
 }
 
 // batchSize bounds how many unpublished events one tick fetches, so a
@@ -71,7 +75,7 @@ func (r *Relay) relayOnce(ctx context.Context) {
 	for _, event := range events {
 		// event_type doubles as the Kafka topic name — a deliberate 1:1
 		// mapping, see docs/guides/Kimo-Wallet-Architecture.md §5's event list.
-		if err := r.publisher.Publish(ctx, event.EventType, []byte(event.ID), event.Payload); err != nil {
+		if err := r.publisher.Publish(ctx, event.EventType, []byte(event.ID), event.Payload, nil); err != nil {
 			r.logger.Error("publish outbox event", "error", err.Error(), "event_id", event.ID, "event_type", event.EventType)
 			continue
 		}

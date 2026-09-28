@@ -15,6 +15,10 @@ type stubWalletRepository struct {
 	getWalletByUserIDErr error
 	// createCalls records every userID Create was called with.
 	createCalls []string
+
+	applyTransferStatus string
+	applyTransferReason *string
+	applyTransferErr    error
 }
 
 func (s *stubWalletRepository) Create(ctx context.Context, id, userID string) (domain.Wallet, error) {
@@ -30,6 +34,10 @@ func (s *stubWalletRepository) GetWalletByUserID(ctx context.Context, userID str
 		return domain.Wallet{}, s.getWalletByUserIDErr
 	}
 	return s.existingWallet, nil
+}
+
+func (s *stubWalletRepository) ApplyTransfer(ctx context.Context, transactionID string, senderWalletID string, receiverWalletID string, amount int64, currency string) (status string, failureReason *string, err error) {
+	return s.applyTransferStatus, s.applyTransferReason, s.applyTransferErr
 }
 
 func TestWalletService_CreateWallet_Success(t *testing.T) {

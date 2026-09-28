@@ -4,17 +4,11 @@ package eventconsumer
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
 
 	"github.com/segmentio/kafka-go"
-	"google.golang.org/protobuf/encoding/protojson"
-
-	userv1 "github.com/jrmygp/kimo-wallet/apps/wallet-service/gen/user/v1"
-	"github.com/jrmygp/kimo-wallet/apps/wallet-service/internal/domain"
 )
 
 // Reader is the subset of a Kafka consumer this handler needs — satisfied
@@ -24,9 +18,16 @@ type Reader interface {
 	CommitMessages(ctx context.Context, msgs ...kafka.Message) error
 }
 
-// WalletService is the subset of service.WalletService this handler needs.
-type WalletService interface {
-	CreateWallet(ctx context.Context, userID string) (domain.Wallet, error)
+// Processor decodes one Kafka message and performs whatever it means for
+// that event type — e.g. UserCreatedProcessor unmarshals a UserCreated
+// event and provisions a wallet, TransactionCreatedProcessor unmarshals a
+// TransactionCreated event and applies a transfer. Handler knows nothing
+// about any specific event type; it only knows how to reliably retry,
+// dead-letter, and commit whatever a Processor is given. One Handler is
+// constructed per topic, each with the Processor that matches it — see
+// cmd/server/main.go.
+type Processor interface {
+	Process(ctx context.Context, msg kafka.Message) error
 }
 
 // DeadLetterPublisher is the subset of a Kafka producer this handler
@@ -40,7 +41,7 @@ type DeadLetterPublisher interface {
 // deadLetterTopicSuffix turns the original topic into its dead-letter
 // counterpart — "user.created" -> "user.created.dlq". One suffix,
 // applied to whatever topic this Handler happens to be consuming, so it
-// isn't hardcoded to "user.created" specifically.
+// isn't hardcoded to any one topic.
 const deadLetterTopicSuffix = ".dlq"
 
 // Header keys on a dead-lettered message. The message's own Value is
@@ -82,14 +83,14 @@ const defaultRetryBackoff = 2 * time.Second
 
 type Handler struct {
 	reader       Reader
-	wallets      WalletService
+	processor    Processor
 	deadLetter   DeadLetterPublisher
 	logger       *slog.Logger
 	retryBackoff time.Duration
 }
 
-func NewHandler(reader Reader, wallets WalletService, deadLetter DeadLetterPublisher, logger *slog.Logger) *Handler {
-	return &Handler{reader: reader, wallets: wallets, deadLetter: deadLetter, logger: logger, retryBackoff: defaultRetryBackoff}
+func NewHandler(reader Reader, processor Processor, deadLetter DeadLetterPublisher, logger *slog.Logger) *Handler {
+	return &Handler{reader: reader, processor: processor, deadLetter: deadLetter, logger: logger, retryBackoff: defaultRetryBackoff}
 }
 
 // Run fetches and processes messages one at a time until ctx is
@@ -118,11 +119,11 @@ func (h *Handler) Run(ctx context.Context) {
 func (h *Handler) processWithRetry(ctx context.Context, msg kafka.Message) {
 	var lastErr error
 	for attempt := 1; attempt <= maxProcessAttempts; attempt++ {
-		lastErr = h.process(ctx, msg)
+		lastErr = h.processor.Process(ctx, msg)
 		if lastErr == nil {
 			break
 		}
-		h.logger.Error("process user.created event", "error", lastErr.Error(), "attempt", attempt, "offset", msg.Offset)
+		h.logger.Error("process event", "topic", msg.Topic, "error", lastErr.Error(), "attempt", attempt, "offset", msg.Offset)
 		if attempt < maxProcessAttempts {
 			time.Sleep(h.retryBackoff)
 		}
@@ -130,7 +131,7 @@ func (h *Handler) processWithRetry(ctx context.Context, msg kafka.Message) {
 
 	if lastErr != nil {
 		h.logger.Error("giving up on event after max attempts, dead-lettering",
-			"attempts", maxProcessAttempts, "offset", msg.Offset, "error", lastErr.Error())
+			"topic", msg.Topic, "attempts", maxProcessAttempts, "offset", msg.Offset, "error", lastErr.Error())
 		h.deadLetterOrLog(ctx, msg, lastErr)
 	}
 
@@ -173,19 +174,4 @@ func (h *Handler) deadLetterOrLog(ctx context.Context, msg kafka.Message, proces
 
 	h.logger.Error("publish to dead-letter topic failed after retries — message content will only be recoverable from the original topic's own retention, if any",
 		"dlq_topic", dlqTopic, "offset", msg.Offset, "error", publishErr.Error())
-}
-
-func (h *Handler) process(ctx context.Context, msg kafka.Message) error {
-	var event userv1.UserCreated
-	if err := protojson.Unmarshal(msg.Value, &event); err != nil {
-		return fmt.Errorf("unmarshal user.created payload: %w", err)
-	}
-	if event.GetUserId() == "" {
-		return errors.New("user.created event missing user_id")
-	}
-
-	if _, err := h.wallets.CreateWallet(ctx, event.GetUserId()); err != nil {
-		return fmt.Errorf("create wallet for user %s: %w", event.GetUserId(), err)
-	}
-	return nil
 }

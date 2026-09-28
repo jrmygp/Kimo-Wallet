@@ -14,6 +14,7 @@ import (
 type WalletRepository interface {
 	Create(ctx context.Context, id, userID string) (domain.Wallet, error)
 	GetWalletByUserID(ctx context.Context, userID string) (domain.Wallet, error)
+	ApplyTransfer(ctx context.Context, transactionID string, senderWalletID string, receiverWalletID string, amount int64, currency string) (status string, failureReason *string, err error)
 }
 
 type WalletService struct {
@@ -59,4 +60,8 @@ func (s *WalletService) GetWalletByUserID(ctx context.Context, userID string) (d
 	}
 
 	return wallet, nil
+}
+
+func (s *WalletService) ApplyTransfer(ctx context.Context, transactionID string, senderWalletID string, receiverWalletID string, amount int64, currency string) (status string, failureReason *string, err error) {
+	return s.repo.ApplyTransfer(ctx, transactionID, senderWalletID, receiverWalletID, amount, currency)
 }
