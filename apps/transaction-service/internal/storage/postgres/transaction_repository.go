@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/gorm"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	transactionv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/transaction/v1"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/domain"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/idgen"
 )
 
 const pgUniqueViolation = "23505"
@@ -47,6 +50,8 @@ func NewTransactionRepository(db *gorm.DB) *TransactionRepository {
 }
 
 func (r *TransactionRepository) Create(ctx context.Context, id string, request domain.TransactionRequest) (domain.Transaction, error) {
+	var created domain.Transaction
+
 	row := transactionModel{
 		ID:               id,
 		IdempotencyKey:   request.IdempotencyKey,
@@ -59,26 +64,59 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 		Status:           statusPending,
 	}
 
-	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == uniqueIdempotencyKeyConstraint {
-			return domain.Transaction{}, domain.ErrIdempotencyConflict
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&row).Error; err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == uniqueIdempotencyKeyConstraint {
+				return domain.ErrIdempotencyConflict
+			}
+			return fmt.Errorf("insert transaction: %w", err)
 		}
-		return domain.Transaction{}, fmt.Errorf("insert transaction: %w", err)
+
+		eventID, err := idgen.NewV4()
+		if err != nil {
+			return fmt.Errorf("generate outbox event id: %w", err)
+		}
+
+		payload, err := protojson.Marshal(&transactionv1.TransactionCreated{
+			TransactionId:    row.ID,
+			SenderWalletId:   row.SenderWalletID,
+			ReceiverWalletId: row.ReceiverWalletID,
+			Amount:           row.Amount,
+			Currency:         row.Currency,
+		})
+		if err != nil {
+			return fmt.Errorf("marshal transaction.processed payload: %w", err)
+		}
+
+		outboxRow := outboxEventModel{
+			ID:        eventID,
+			EventType: EventTypeTransactionCreated,
+			Payload:   payload,
+		}
+		if err := tx.Create(&outboxRow).Error; err != nil {
+			return fmt.Errorf("insert outbox event: %w", err)
+		}
+
+		created = domain.Transaction{
+			ID:               row.ID,
+			IdempotencyKey:   row.IdempotencyKey,
+			SenderUserID:     row.SenderUserID,
+			SenderWalletID:   row.SenderWalletID,
+			ReceiverUserID:   row.ReceiverUserID,
+			ReceiverWalletID: row.ReceiverWalletID,
+			Currency:         row.Currency,
+			Amount:           row.Amount,
+			Status:           row.Status,
+			CreatedAt:        row.CreatedAt,
+			UpdatedAt:        row.UpdatedAt,
+			CompletedAt:      row.CompletedAt,
+		}
+		return nil
+	})
+	if err != nil {
+		return domain.Transaction{}, err
 	}
 
-	return domain.Transaction{
-		ID:               row.ID,
-		IdempotencyKey:   row.IdempotencyKey,
-		SenderUserID:     row.SenderUserID,
-		SenderWalletID:   row.SenderWalletID,
-		ReceiverUserID:   row.ReceiverUserID,
-		ReceiverWalletID: row.ReceiverWalletID,
-		Currency:         row.Currency,
-		Amount:           row.Amount,
-		Status:           row.Status,
-		CreatedAt:        row.CreatedAt,
-		UpdatedAt:        row.UpdatedAt,
-		CompletedAt:      row.CompletedAt,
-	}, nil
+	return created, nil
 }
