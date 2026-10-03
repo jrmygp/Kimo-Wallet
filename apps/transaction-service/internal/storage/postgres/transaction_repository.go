@@ -120,3 +120,5 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 
 	return created, nil
 }
+
+func (r *TransactionRepository) UpdateStatus(ctx context.Context, transactionID string, status string)
