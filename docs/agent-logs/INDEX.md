@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-10-03 — Entry 12 — [Fix the four remaining findings from the CreateTransaction integration scan](2026-10-03.md) — apps/api-gateway, apps/transaction-service — money:yes — completed
 - 2026-10-03 — Entry 11 — [Restyle /wallet/transfer/[userId] to match the design system (visual only, scope confirmed with user)](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 10 — [Fix the logout confirmation dialog wiring; enhance its UI](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 9 — [Add a logout button to the home page header (UI only, no logic)](2026-10-03.md) — apps/web — money:no — completed

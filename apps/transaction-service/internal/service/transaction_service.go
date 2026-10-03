@@ -51,19 +51,32 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, request doma
 
 	// GetWalletByUserID returns an error (codes.NotFound) on a missing
 	// wallet — it never succeeds with a nil Wallet — so NotFound must be
-	// read off the error itself, not the response.
-	if _, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.SenderUserID}); err != nil {
+	// read off the error itself, not the response. The response is also
+	// checked against the client-supplied wallet id, not just discarded:
+	// confirming the *user* has *a* wallet is not the same as confirming
+	// the *specific wallet id in the request* is theirs (§6) — without
+	// this, an authenticated sender could still name someone else's real
+	// wallet id and have it debited.
+	senderWallet, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.SenderUserID})
+	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return domain.Transaction{}, domain.ErrSenderNotFound
 		}
 		return domain.Transaction{}, fmt.Errorf("sender wallet lookup: %w", err)
 	}
+	if senderWallet.GetWallet().GetId() != request.SenderWalletID {
+		return domain.Transaction{}, domain.ErrSenderWalletMismatch
+	}
 
-	if _, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.ReceiverUserID}); err != nil {
+	receiverWallet, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.ReceiverUserID})
+	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return domain.Transaction{}, domain.ErrReceiverNotFound
 		}
 		return domain.Transaction{}, fmt.Errorf("receiver wallet lookup: %w", err)
+	}
+	if receiverWallet.GetWallet().GetId() != request.ReceiverWalletID {
+		return domain.Transaction{}, domain.ErrReceiverWalletMismatch
 	}
 
 	id, err := idgen.NewV4()

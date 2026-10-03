@@ -57,10 +57,14 @@ func (s *stubTransactionRepository) UpdateStatus(ctx context.Context, transactio
 // stubWalletServiceClient reports notFoundUserIDs as codes.NotFound (the
 // real client's behaviour for a missing wallet, per
 // TransactionService.CreateTransaction's own comment) and err for every
-// other call, regardless of which user id is asked about.
+// other call, regardless of which user id is asked about. Otherwise it
+// reports senderUserID/receiverUserID as owning senderWalletID/
+// receiverWalletID (matching validRequest()) unless overridden via
+// walletIDByUserID — see the wallet-mismatch tests below.
 type stubWalletServiceClient struct {
-	notFoundUserIDs map[string]bool
-	err             error
+	notFoundUserIDs  map[string]bool
+	err              error
+	walletIDByUserID map[string]string
 }
 
 func (s *stubWalletServiceClient) GetWalletByUserID(ctx context.Context, in *walletv1.GetWalletByUserIDRequest, opts ...grpc.CallOption) (*walletv1.GetWalletByUserIDResponse, error) {
@@ -70,7 +74,17 @@ func (s *stubWalletServiceClient) GetWalletByUserID(ctx context.Context, in *wal
 	if s.err != nil {
 		return nil, s.err
 	}
-	return &walletv1.GetWalletByUserIDResponse{}, nil
+
+	walletID := s.walletIDByUserID[in.GetUserId()]
+	if walletID == "" {
+		switch in.GetUserId() {
+		case senderUserID:
+			walletID = senderWalletID
+		case receiverUserID:
+			walletID = receiverWalletID
+		}
+	}
+	return &walletv1.GetWalletByUserIDResponse{Wallet: &walletv1.Wallet{Id: walletID}}, nil
 }
 
 func TestTransactionService_CreateTransaction_Success(t *testing.T) {
@@ -116,6 +130,39 @@ func TestTransactionService_CreateTransaction_ReceiverNotFound(t *testing.T) {
 	}
 	if len(repo.createCalls) != 0 {
 		t.Fatalf("repo.Create called %d times, want 0 — receiver lookup failed before persistence", len(repo.createCalls))
+	}
+}
+
+// TestTransactionService_CreateTransaction_SenderWalletMismatch proves a
+// request naming a real sender user id but a wallet id that isn't that
+// user's own wallet is rejected, not silently accepted — the sender user
+// existing is not sufficient authorization to debit an arbitrary wallet
+// (docs/CLAUDE.md §6).
+func TestTransactionService_CreateTransaction_SenderWalletMismatch(t *testing.T) {
+	repo := &stubTransactionRepository{}
+	wallet := &stubWalletServiceClient{walletIDByUserID: map[string]string{senderUserID: "someone-elses-wallet"}}
+	svc := NewTransactionService(repo, wallet)
+
+	_, err := svc.CreateTransaction(context.Background(), validRequest())
+	if !errors.Is(err, domain.ErrSenderWalletMismatch) {
+		t.Fatalf("CreateTransaction() error = %v, want %v", err, domain.ErrSenderWalletMismatch)
+	}
+	if len(repo.createCalls) != 0 {
+		t.Fatalf("repo.Create called %d times, want 0 — a sender wallet mismatch must block persistence", len(repo.createCalls))
+	}
+}
+
+func TestTransactionService_CreateTransaction_ReceiverWalletMismatch(t *testing.T) {
+	repo := &stubTransactionRepository{}
+	wallet := &stubWalletServiceClient{walletIDByUserID: map[string]string{receiverUserID: "someone-elses-wallet"}}
+	svc := NewTransactionService(repo, wallet)
+
+	_, err := svc.CreateTransaction(context.Background(), validRequest())
+	if !errors.Is(err, domain.ErrReceiverWalletMismatch) {
+		t.Fatalf("CreateTransaction() error = %v, want %v", err, domain.ErrReceiverWalletMismatch)
+	}
+	if len(repo.createCalls) != 0 {
+		t.Fatalf("repo.Create called %d times, want 0 — a receiver wallet mismatch must block persistence", len(repo.createCalls))
 	}
 }
 
