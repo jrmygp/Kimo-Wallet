@@ -9,10 +9,11 @@ import (
 )
 
 type Config struct {
-	GRPCPort          string
-	DatabaseURL       string
-	WalletServiceAddr string
-	KafkaBrokers      []string
+	GRPCPort           string
+	DatabaseURL        string
+	WalletServiceAddr  string
+	KafkaBrokers       []string
+	KafkaConsumerGroup string
 }
 
 // Load reads configuration from environment variables, failing fast if a
@@ -39,10 +40,16 @@ func Load() (Config, error) {
 		kafkaBrokers = "localhost:9092"
 	}
 
+	kafkaConsumerGroup := os.Getenv("TRANSACTION_SERVICE_KAFKA_CONSUMER_GROUP")
+	if kafkaConsumerGroup == "" {
+		kafkaConsumerGroup = "transaction-service"
+	}
+
 	return Config{
-		GRPCPort:          grpcPort,
-		DatabaseURL:       databaseURL,
-		WalletServiceAddr: walletServiceAddr,
-		KafkaBrokers:      strings.Split(kafkaBrokers, ","),
+		GRPCPort:           grpcPort,
+		DatabaseURL:        databaseURL,
+		WalletServiceAddr:  walletServiceAddr,
+		KafkaBrokers:       strings.Split(kafkaBrokers, ","),
+		KafkaConsumerGroup: kafkaConsumerGroup,
 	}, nil
 }

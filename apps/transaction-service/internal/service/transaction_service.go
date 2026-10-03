@@ -18,6 +18,7 @@ import (
 
 type TransactionRepository interface {
 	Create(ctx context.Context, id string, request domain.TransactionRequest) (domain.Transaction, error)
+	UpdateStatus(ctx context.Context, transactionID string, status string, failureReason *string) error
 }
 
 type WalletServiceClient interface {
@@ -71,4 +72,11 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, request doma
 	}
 
 	return s.repo.Create(ctx, id, request)
+}
+
+func (s *TransactionService) UpdateTransactionStatus(ctx context.Context, transactionID string, status string, failureReason *string) error {
+	if err := s.repo.UpdateStatus(ctx, transactionID, status, failureReason); err != nil {
+		return fmt.Errorf("update transaction status: %w", err)
+	}
+	return nil
 }

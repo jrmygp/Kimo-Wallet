@@ -19,7 +19,9 @@ import (
 	transactionv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/transaction/v1"
 	walletv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/wallet/v1"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/config"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/eventconsumer"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/grpcserver"
+	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/kafkaconsumer"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/kafkaproducer"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/outbox"
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/service"
@@ -94,6 +96,20 @@ func run(logger *slog.Logger) error {
 	transactionService := service.NewTransactionService(repo, walletClient)
 	transactionServer := grpcserver.NewTransactionServer(transactionService)
 
+	walletConsumer := kafkaconsumer.New(cfg.KafkaBrokers, cfg.KafkaConsumerGroup, transactionProcessedTopic)
+	defer func() {
+		if err := walletConsumer.Close(); err != nil {
+			logger.Error("close kafka consumer", "error", err.Error())
+		}
+	}()
+
+	deadLetterProducer := kafkaproducer.New(cfg.KafkaBrokers)
+	defer func() {
+		if err := deadLetterProducer.Close(); err != nil {
+			logger.Error("close dead-letter kafka producer", "error", err.Error())
+		}
+	}()
+
 	producer := kafkaproducer.New(cfg.KafkaBrokers)
 
 	outboxRepo := postgres.NewOutboxRepository(db)
@@ -113,6 +129,12 @@ func run(logger *slog.Logger) error {
 	go func() {
 		logger.Info("grpc server listening", "port", cfg.GRPCPort)
 		serveErr <- grpcServer.Serve(listener)
+	}()
+
+	walletHandler := eventconsumer.NewHandler(walletConsumer, eventconsumer.NewTransactionProcessedProcessor(transactionService), deadLetterProducer, logger)
+	go func() {
+		logger.Info("consuming", "topic", transactionProcessedTopic, "group", cfg.KafkaConsumerGroup)
+		walletHandler.Run(ctx)
 	}()
 
 	select {

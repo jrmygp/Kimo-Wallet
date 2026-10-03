@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	ErrSenderNotFound      = errors.New("sender user not found")
-	ErrReceiverNotFound    = errors.New("receiver user not found")
-	ErrIdempotencyConflict = errors.New("idempotency key conflict")
-
+	ErrSenderNotFound        = errors.New("sender user not found")
+	ErrReceiverNotFound      = errors.New("receiver user not found")
+	ErrIdempotencyConflict   = errors.New("idempotency key conflict")
+	ErrTransactionNotFound   = errors.New("transaction not found")
 	ErrInvalidIdempotencyKey = errors.New("idempotency key is required")
 	ErrInvalidID             = errors.New("id must be a valid uuid")
 	ErrSenderIsReceiver      = errors.New("sender and receiver must be different users")

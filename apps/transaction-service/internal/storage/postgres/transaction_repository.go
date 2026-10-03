@@ -22,6 +22,7 @@ const uniqueIdempotencyKeyConstraint = "transactions_idempotency_key_sender_user
 // beyond this package yet — nothing here transitions it further; see
 // docs/CLAUDE.md §3.5 for the full state machine this will eventually need.
 const statusPending = "PENDING"
+const statusProcessing = "PROCESSING"
 
 type transactionModel struct {
 	ID               string `gorm:"primaryKey"`
@@ -121,4 +122,23 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 	return created, nil
 }
 
-func (r *TransactionRepository) UpdateStatus(ctx context.Context, transactionID string, status string)
+func (r *TransactionRepository) UpdateStatus(ctx context.Context, transactionID string, status string, failureReason *string) error {
+	now := time.Now()
+
+	result := r.db.WithContext(ctx).Model(&transactionModel{}).Where("id = ? AND status IN (?)", transactionID, []string{statusPending, statusProcessing}).Updates(map[string]any{
+		"status":         status,
+		"failure_reason": failureReason,
+		"completed_at":   now,
+		"updated_at":     now,
+	})
+
+	if result.Error != nil {
+		return fmt.Errorf("update transaction status: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.ErrTransactionNotFound
+	}
+
+	return nil
+}
