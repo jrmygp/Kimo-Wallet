@@ -18,6 +18,8 @@ Rules:
 
 ## Entries
 
+- 2026-10-03 — Entry 7 — [Redesign /wallet/qr and /wallet/history; shared AppBar + AppColumn](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 6 — [Redesign the home page (balance hero, quick actions, recent activity)](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 5 — [Redesign the register page to match login; extract shared auth components](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 4 — [Redesign the login page](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 3 — [UI/UX Pro Max review of apps/web, saved to docs/reviews](2026-10-03.md) — docs/reviews — money:no — completed

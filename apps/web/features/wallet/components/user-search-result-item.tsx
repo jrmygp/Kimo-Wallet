@@ -1,5 +1,7 @@
+import { ChevronRightIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { WalletUser } from "@/features/wallet/schemas/user.schema";
+import { getInitials } from "@/lib/utils";
 
 export function UserSearchResultItem({ user, onClick }: { user: WalletUser; onClick?: (userId: string) => void }) {
   return (
@@ -8,17 +10,19 @@ export function UserSearchResultItem({ user, onClick }: { user: WalletUser; onCl
       role="option"
       aria-selected={false}
       onClick={() => onClick?.(user.kimoId)}
-      className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kimo-500"
+      className="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
     >
       <Avatar size="lg">
-        <AvatarImage src={user.profilePicture || "https://github.com/shadcn.png"} alt={`${user.fullName}-img`} />
-        <AvatarFallback>{user.fullName.slice(0, 2).toUpperCase()}</AvatarFallback>
+        {user.profilePicture && <AvatarImage src={user.profilePicture} alt="" />}
+        <AvatarFallback className="bg-kimo-100 font-semibold text-kimo-800">{getInitials(user.fullName)}</AvatarFallback>
       </Avatar>
 
-      <div className="flex flex-col">
-        <p className="text-foreground">{user.fullName}</p>
-        <p className="text-xs text-muted-foreground">{user.phoneNumber}</p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-medium text-foreground">{user.fullName}</p>
+        <p className="text-xs text-muted-foreground">KimoID {user.kimoId}</p>
       </div>
+
+      <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
     </button>
   );
 }

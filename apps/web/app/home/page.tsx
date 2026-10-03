@@ -1,247 +1,104 @@
 "use client";
 
-import { useState } from "react";
-import Page from "@/components/layout/Page";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  MdOutlineQrCode2,
-  MdOutlineViewList,
-  MdOutlineAddCard,
-  MdSend,
-  MdSettings,
-  MdEmail,
-  MdOutlineVisibility,
-  MdOutlineVisibilityOff,
-} from "react-icons/md";
+import Image from "next/image";
+import Link from "next/link";
+import { HistoryIcon, PlusIcon, QrCodeIcon, SendIcon } from "lucide-react";
 import image1 from "@/public/images/carousel1.jpeg";
 import image2 from "@/public/images/carousel2.jpeg";
 import image3 from "@/public/images/carousel3.jpeg";
-import Image from "next/image";
-import Link from "next/link";
-import { TransactionRow } from "@/features/transaction/components/transaction-row";
-import type { Transaction } from "@/features/transaction/types";
+import { AppColumn } from "@/components/layout/app-column";
+import { RecentTransactions } from "@/features/transaction/components/recent-transactions";
+import { TransferRecipientSheet } from "@/features/wallet/components/transfer-recipient-sheet";
+import { WalletSummary } from "@/features/wallet/components/wallet-summary";
 import { useAppSelector } from "@/lib/store/hooks";
-import { Sheet, SheetContent, SheetClose, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { MdOutlineClose } from "react-icons/md";
-import { SearchIcon } from "lucide-react";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { useSearchUserQuery } from "@/features/wallet/hooks/use-search-user-query";
-import { UserSearchResultItem } from "@/features/wallet/components/user-search-result-item";
-import { useRouter } from "next/navigation";
 
-const menuItemClassName =
-  "flex flex-col items-center gap-1.5 cursor-pointer rounded-md py-3 transition-all duration-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kimo-500";
+const actionClassName =
+  "relative flex min-h-[84px] flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-[13px] leading-4 font-medium text-foreground transition-colors focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none";
 
-const iconWrapperClassName = "flex size-11 items-center justify-center rounded-full bg-white text-kimo-500 shadow-sm";
+const actionIconClassName = "flex size-11 items-center justify-center rounded-full bg-kimo-50 text-primary";
 
-const transactions: Transaction[] = [
-  { id: "1", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
-  { id: "2", counterpartyName: "John Smith", occurredAt: "2026-08-15T13:00:00", amount: 100000, direction: "in" },
-  { id: "3", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
-  { id: "4", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
-  { id: "5", counterpartyName: "Jane Doe", occurredAt: "2026-08-15T17:20:00", amount: 50000, direction: "out" },
+const promotions = [
+  { src: image1, alt: "Transfer to all banks and e-wallets with no admin fee." },
+  { src: image2, alt: "Kimo, rated number one in Asia for security and reach." },
+  { src: image3, alt: "Coming soon: send funds to crypto wallets such as ETH and LTC." },
 ];
+
 const HomePage = () => {
   const userData = useAppSelector((state) => state.user);
-  const router = useRouter();
-  const [balanceHidden, setBalanceHidden] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  // Only set on Enter (see InputGroupInput's onKeyDown below), never on
-  // every keystroke — that's what makes the search fire once per
-  // submission instead of once per character typed.
-  const [searchId, setSearchId] = useState("");
-  const {
-    data: matchedUser,
-    isFetching: isSearching,
-    isError: searchFailed,
-    error: searchError,
-  } = useSearchUserQuery(searchId);
-
-  const onClickUser = (userId: string) => {
-    setOpen(false);
-    router.push(`/wallet/transfer/${userId}`);
-  };
 
   return (
-    <Page>
-      <div className="flex min-h-full w-full flex-col gap-8 items-center">
-        {/* Profile section */}
-        <section className="bg-kimo-500 w-full px-4 h-40 flex flex-col py-4 sm:flex-row sm:py-0 sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Avatar size="2xl">
-              <AvatarImage src={userData.user?.profilePicture || "https://github.com/shadcn.png"} />
-              <AvatarFallback>{userData.user?.fullName.slice(0, 2).toUpperCase() ?? "CN"}</AvatarFallback>
-            </Avatar>
+    <AppColumn className="pb-[max(2rem,env(safe-area-inset-bottom))]">
+        <h1 className="sr-only">Home</h1>
 
-            <div className="flex flex-col">
-              <p className="font-bold text-xl text-white">{userData.user?.fullName}</p>
-              <p className="text-sm text-white/80">{userData.user?.phoneNumber}</p>
-            </div>
-          </div>
+        <WalletSummary user={userData.user} balance={userData.balance} />
 
-          <div className="flex flex-col items-start sm:items-end">
-            <p className="font-bold text-xl text-white text-left sm:text-right">My Balance</p>
-            <div className="flex items-center gap-2">
-              <p className="text-2xl text-white text-left sm:text-right tabular-nums">
-                {balanceHidden
-                  ? "Rp ••••••"
-                  : `${userData.balance?.currency} ${userData.balance?.balance?.toLocaleString("id")}`}
-              </p>
-              <button
-                type="button"
-                onClick={() => setBalanceHidden((hidden) => !hidden)}
-                aria-label={balanceHidden ? "Show balance" : "Hide balance"}
-                aria-pressed={balanceHidden}
-                className="cursor-pointer text-white/80 transition-colors hover:text-white"
-              >
-                {balanceHidden ? <MdOutlineVisibilityOff size={20} /> : <MdOutlineVisibility size={20} />}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Menus */}
-        <section className="bg-white px-4 sm:px-10 flex flex-col w-full">
-          <div className="rounded-md p-4 grid grid-cols-3 gap-y-4 bg-kimo-50">
-            <button type="button" className={menuItemClassName}>
-              <span className={iconWrapperClassName}>
-                <MdOutlineAddCard size={22} />
-              </span>
-              <p className="text-sm text-center font-medium">Top Up</p>
-            </button>
-
-            <Sheet
-              open={open}
-              onOpenChange={(nextOpen) => {
-                setOpen(nextOpen);
-                if (!nextOpen) {
-                  // Start clean next time it's opened, rather than showing
-                  // a stale search from the previous visit.
-                  setQuery("");
-                  setSearchId("");
-                }
-              }}
-            >
-              <SheetTrigger className={menuItemClassName}>
-                <span className={iconWrapperClassName}>
-                  <MdSend size={22} />
-                </span>
-                <p className="text-sm text-center font-medium">Transfer</p>
-              </SheetTrigger>
-
-              <SheetContent
-                side="bottom"
-                showCloseButton={false}
-                className="data-[side=bottom]:h-[80vh] gap-0 p-0 rounded-t-2xl"
-              >
-                <SheetHeader className="gap-3 border-b border-border pb-4">
-                  <div className="flex items-center justify-between">
-                    <SheetTitle>Select account beneficiary</SheetTitle>
-                    <SheetClose>
-                      <MdOutlineClose size={20} className="cursor-pointer" />
-                    </SheetClose>
-                  </div>
-
-                  <InputGroup className="border">
-                    <InputGroupAddon>
-                      <SearchIcon />
-                    </InputGroupAddon>
-
-                    <InputGroupInput
-                      autoFocus
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key !== "Enter") return;
-                        event.preventDefault();
-                        setSearchId(query.trim());
-                      }}
-                      placeholder="Search by KimoID"
-                    />
-                  </InputGroup>
-                </SheetHeader>
-
-                <div role="listbox" className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-                  {isSearching && <p className="px-2 py-4 text-center text-sm text-muted-foreground">Searching...</p>}
-
-                  {!isSearching && searchFailed && (
-                    <p role="alert" className="px-2 py-4 text-center text-sm text-destructive">
-                      {searchError.message}
-                    </p>
-                  )}
-
-                  {!isSearching && !searchFailed && matchedUser && (
-                    <UserSearchResultItem user={matchedUser} onClick={(userId: string) => onClickUser(userId)} />
-                  )}
-
-                  {!isSearching && !searchFailed && !matchedUser && searchId.length === 0 && (
-                    <p className="px-2 py-4 text-center text-sm text-muted-foreground">
-                      Search by your recipient&apos;s KimoID.
-                    </p>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            <Link href="/wallet/qr" className={menuItemClassName}>
-              <span className={iconWrapperClassName}>
-                <MdOutlineQrCode2 size={22} />
-              </span>
-              <p className="text-sm text-center font-medium">QRIS</p>
-            </Link>
-
-            <Link href="/wallet/history" className={menuItemClassName}>
-              <span className={iconWrapperClassName}>
-                <MdOutlineViewList size={22} />
-              </span>
-              <p className="text-sm text-center font-medium">History</p>
-            </Link>
-
-            <button type="button" className={menuItemClassName}>
-              <span className={iconWrapperClassName}>
-                <MdEmail size={22} />
-              </span>
-              <p className="text-sm text-center font-medium">Inbox</p>
-            </button>
-
-            <button type="button" className={menuItemClassName}>
-              <span className={iconWrapperClassName}>
-                <MdSettings size={22} />
-              </span>
-              <p className="text-sm text-center font-medium">Settings</p>
-            </button>
-          </div>
-        </section>
-
-        {/* Promotion carousel */}
-        <section
-          aria-label="Promotions"
-          className="flex w-full min-w-0 snap-x snap-mandatory items-center gap-4 overflow-x-auto px-10 pb-1"
+        <nav
+          aria-label="Wallet actions"
+          className="relative mx-4 -mt-10 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-card p-2 shadow-[0_1px_2px_rgb(16_24_40/0.06)]"
         >
-          <div className="w-96 shrink-0 snap-center overflow-hidden rounded-md shadow-lg">
-            <Image src={image1} alt="Promotion 1" />
-          </div>
-          <div className="w-96 shrink-0 snap-center overflow-hidden rounded-md shadow-lg">
-            <Image src={image2} alt="Promotion 2" />
-          </div>
-          <div className="w-96 shrink-0 snap-center overflow-hidden rounded-md shadow-lg">
-            <Image src={image3} alt="Promotion 3" />
-          </div>
-        </section>
+          <button
+            type="button"
+            aria-disabled
+            title="Top Up is coming soon"
+            className={`${actionClassName} cursor-not-allowed text-muted-foreground`}
+          >
+            <span className={`${actionIconClassName} bg-muted text-muted-foreground`}>
+              <PlusIcon className="size-5" aria-hidden />
+            </span>
+            Top Up
+            <span className="absolute top-1 right-1 rounded-full bg-amber-100 px-1.5 text-xs leading-4 font-semibold text-amber-800">
+              Soon
+            </span>
+            <span className="sr-only">(coming soon)</span>
+          </button>
 
-        {/* Latest transactions */}
-        <section className="w-full flex flex-col gap-6 px-4 sm:px-10 border-t border-border bg-muted/40 py-6">
-          <p className="font-medium text-left text-foreground text-lg">Latest Transactions</p>
+          <TransferRecipientSheet triggerClassName={`${actionClassName} cursor-pointer hover:bg-muted`}>
+            <span className={actionIconClassName}>
+              <SendIcon className="size-5" aria-hidden />
+            </span>
+            Transfer
+          </TransferRecipientSheet>
 
-          <div className="flex flex-col gap-4">
-            {transactions.map((transaction) => (
-              <TransactionRow key={transaction.id} transaction={transaction} />
+          <Link href="/wallet/qr" className={`${actionClassName} hover:bg-muted`}>
+            <span className={actionIconClassName}>
+              <QrCodeIcon className="size-5" aria-hidden />
+            </span>
+            QRIS
+          </Link>
+
+          <Link href="/wallet/history" className={`${actionClassName} hover:bg-muted`}>
+            <span className={actionIconClassName}>
+              <HistoryIcon className="size-5" aria-hidden />
+            </span>
+            History
+          </Link>
+        </nav>
+
+        <div className="mt-6">
+          <RecentTransactions />
+        </div>
+
+        <section aria-labelledby="promotions-heading" className="mt-8">
+          <h2 id="promotions-heading" className="px-4 text-lg leading-6 font-semibold text-foreground">
+            For you
+          </h2>
+          {/* Focusable so keyboard users can scroll it with the arrow keys. */}
+          <div
+            tabIndex={0}
+            aria-label="Promotions, scroll horizontally"
+            className="mt-3 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none"
+          >
+            {promotions.map((promotion) => (
+              <div
+                key={promotion.alt}
+                className="w-[85%] shrink-0 snap-start overflow-hidden rounded-2xl border border-border bg-card"
+              >
+                <Image src={promotion.src} alt={promotion.alt} sizes="(min-width: 640px) 380px, 85vw" />
+              </div>
             ))}
           </div>
         </section>
-      </div>
-    </Page>
+    </AppColumn>
   );
 };
 

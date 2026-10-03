@@ -7,7 +7,8 @@ import { searchUserById } from "@/features/wallet/api/search-user";
  * read-vs-write split noted in useLoginMutation's doc comment.
  *
  * `id` is expected to be the *submitted* id, not the raw input on every
- * keystroke — the caller only updates it on Enter (see app/home/page.tsx),
+ * keystroke — the caller only updates it on Enter (see
+ * features/wallet/components/transfer-recipient-sheet.tsx),
  * which is what makes this fire once per submission instead of per
  * keystroke. `enabled` gates the very first render before anything has
  * been submitted. `retry: false` because a miss here is an expected "not
