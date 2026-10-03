@@ -18,6 +18,13 @@ Rules:
 
 ## Entries
 
+- 2026-10-03 — Entry 7 — [Redesign /wallet/qr and /wallet/history; shared AppBar + AppColumn](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 6 — [Redesign the home page (balance hero, quick actions, recent activity)](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 5 — [Redesign the register page to match login; extract shared auth components](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 4 — [Redesign the login page](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 3 — [UI/UX Pro Max review of apps/web, saved to docs/reviews](2026-10-03.md) — docs/reviews — money:no — completed
+- 2026-10-03 — Entry 2 — [Save the UI critique as a markdown doc](2026-10-03.md) — docs/reviews — money:no — completed
+- 2026-10-03 — Entry 1 — [Read-only UI critique of apps/web (anti-ui-slop audit)](2026-10-03.md) — apps/web — money:no — completed
 - 2026-09-28 — Entry 1 — [Design doc: settling a transaction (wallet debit/credit)](2026-09-28.md) — docs/plans — money:yes — completed
 - 2026-09-26 — Entry 1 — [transaction-service: fix everything found in a full scan except test coverage](2026-09-26.md) — apps/transaction-service, root .env/.env.example, packages/contracts/transaction — money:no — completed
 

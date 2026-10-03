@@ -1,33 +1,50 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { formatTransactionAmount, formatTransactionDate } from "@/features/transaction/format";
+import { ArrowDownLeftIcon, ArrowUpRightIcon } from "lucide-react";
+import { formatTransactionAmount, formatTransactionDate, formatTransactionTime } from "@/features/transaction/format";
 import type { Transaction } from "@/features/transaction/types";
+import { cn } from "@/lib/utils";
 
-export function TransactionRow({ transaction }: { transaction: Transaction }) {
+// Direction is carried by the icon, the "Received/Sent" label and the sign — colour only
+// reinforces it. Outgoing money is not red: red is reserved for failures.
+// `dateStyle="time"` is for lists that already group rows under a date header.
+export function TransactionRow({
+  transaction,
+  dateStyle = "full",
+}: {
+  transaction: Transaction;
+  dateStyle?: "full" | "time";
+}) {
+  const incoming = transaction.direction === "in";
+  const Icon = incoming ? ArrowDownLeftIcon : ArrowUpRightIcon;
+
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <Avatar size="lg">
-          <AvatarImage src="https://github.com/shadcn.png" />
-          <AvatarFallback>{transaction.counterpartyName.slice(0, 2).toUpperCase()}</AvatarFallback>
-        </Avatar>
+    <div className="flex items-center gap-3">
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-full",
+          incoming ? "bg-emerald-50 text-emerald-700" : "bg-muted text-foreground",
+        )}
+      >
+        <Icon className="size-5" aria-hidden />
+      </span>
 
-        <div className="flex flex-col">
-          <p className="text-foreground">{transaction.counterpartyName}</p>
-          <p className="text-xs text-muted-foreground">{formatTransactionDate(transaction.occurredAt)}</p>
-        </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] leading-5 font-medium text-foreground">{transaction.counterpartyName}</p>
+        <p className="text-xs leading-4 text-muted-foreground">
+          {incoming ? "Received" : "Sent"} ·{" "}
+          {dateStyle === "time"
+            ? formatTransactionTime(transaction.occurredAt)
+            : formatTransactionDate(transaction.occurredAt)}
+        </p>
       </div>
 
-      <Badge
-        variant={transaction.direction === "out" ? "destructive" : undefined}
-        className={
-          transaction.direction === "in"
-            ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-            : undefined
-        }
+      <p
+        className={cn(
+          "shrink-0 text-[15px] font-semibold tabular-nums",
+          incoming ? "text-emerald-700" : "text-foreground",
+        )}
       >
         {formatTransactionAmount(transaction)}
-      </Badge>
+      </p>
     </div>
   );
 }
