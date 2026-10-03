@@ -22,6 +22,7 @@ import (
 	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/jwtauth"
 	"github.com/jrmygp/kimo-wallet/apps/api-gateway/internal/middleware"
 
+	transactionv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/transaction/v1"
 	userv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/user/v1"
 	walletv1 "github.com/jrmygp/kimo-wallet/apps/api-gateway/gen/wallet/v1"
 )
@@ -71,11 +72,19 @@ func run(logger *slog.Logger) error {
 	}
 	defer walletServiceConn.Close()
 
+	transactionServiceConn, err := grpc.NewClient(cfg.TransactionServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("connect to transaction-service: %w", err)
+	}
+	defer transactionServiceConn.Close()
+
 	userClient := userv1.NewUserServiceClient(userServiceConn)
 	walletClient := walletv1.NewWalletServiceClient(walletServiceConn)
+	transactionClient := transactionv1.NewTransactionServiceClient(transactionServiceConn)
 	userHandler := handler.NewUserHandler(userClient, walletClient, logger)
+	transactionHandler := handler.NewTransactionHandler(transactionClient, logger)
 	tokenVerifier := jwtauth.NewVerifier(cfg.JWTSecret)
-	router := httpserver.NewRouter(userHandler, middleware.RequireAuth(tokenVerifier))
+	router := httpserver.NewRouter(userHandler, transactionHandler, middleware.RequireAuth(tokenVerifier))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,

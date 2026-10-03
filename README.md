@@ -3,6 +3,9 @@ buf lint
 buf generate --template buf.gen.user-service.yaml
 buf generate --template buf.gen.api-gateway.yaml
 
+generate protobuf service folder in target service:
+buf generate --template buf.gen.api-gateway.yaml --path packages/contracts/transaction/v1/transaction.proto
+
 IMPORTANT : create the proto contract inside packages folder!
 
 How to "export-import" service's functions and methods:

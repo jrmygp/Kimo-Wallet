@@ -7,11 +7,12 @@ import (
 )
 
 type Config struct {
-	HTTPPort          string
-	UserServiceAddr   string
-	WalletServiceAddr string
-	JWTSecret         []byte
-	CORSAllowedOrigin string
+	HTTPPort               string
+	UserServiceAddr        string
+	WalletServiceAddr      string
+	TransactionServiceAddr string
+	JWTSecret              []byte
+	CORSAllowedOrigin      string
 }
 
 // Load reads configuration from environment variables, failing fast if a
@@ -26,6 +27,11 @@ func Load() (Config, error) {
 	walletServiceAddr := os.Getenv("WALLET_SERVICE_GRPC_ADDR")
 	if walletServiceAddr == "" {
 		return Config{}, fmt.Errorf("WALLET_SERVICE_GRPC_ADDR is required")
+	}
+
+	transactionServiceAddr := os.Getenv("TRANSACTION_SERVICE_GRPC_ADDR")
+	if transactionServiceAddr == "" {
+		return Config{}, fmt.Errorf("TRANSACTION_SERVICE_GRPC_ADDR is required")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -44,10 +50,11 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		HTTPPort:          httpPort,
-		UserServiceAddr:   userServiceAddr,
-		WalletServiceAddr: walletServiceAddr,
-		JWTSecret:         []byte(jwtSecret),
-		CORSAllowedOrigin: corsAllowedOrigin,
+		HTTPPort:               httpPort,
+		UserServiceAddr:        userServiceAddr,
+		WalletServiceAddr:      walletServiceAddr,
+		TransactionServiceAddr: transactionServiceAddr,
+		JWTSecret:              []byte(jwtSecret),
+		CORSAllowedOrigin:      corsAllowedOrigin,
 	}, nil
 }

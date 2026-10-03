@@ -18,6 +18,9 @@ Rules:
 
 ## Entries
 
+- 2026-10-03 — Entry 11 — [Restyle /wallet/transfer/[userId] to match the design system (visual only, scope confirmed with user)](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 10 — [Fix the logout confirmation dialog wiring; enhance its UI](2026-10-03.md) — apps/web — money:no — completed
+- 2026-10-03 — Entry 9 — [Add a logout button to the home page header (UI only, no logic)](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 8 — [Wire up and fix transaction-service's transaction.processed consumer; add missing tests](2026-10-03.md) — apps/transaction-service, apps/wallet-service — money:yes — completed
 - 2026-10-03 — Entry 7 — [Redesign /wallet/qr and /wallet/history; shared AppBar + AppColumn](2026-10-03.md) — apps/web — money:no — completed
 - 2026-10-03 — Entry 6 — [Redesign the home page (balance hero, quick actions, recent activity)](2026-10-03.md) — apps/web — money:no — completed

@@ -15,6 +15,7 @@
     "axios": "^1.19.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cn": "^0.4.0",
     "country-codes-list": "^3.1.1",
     "country-flag-icons": "^1.6.20",
     "formik": "^2.4.9",
