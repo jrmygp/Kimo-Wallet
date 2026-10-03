@@ -7,8 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
-  --font-heading: var(--font-poppins);
+  --font-sans: var(--font-jakarta);
+  --font-heading: var(--font-jakarta);
+  --color-canvas: var(--canvas);
 
   --color-kimo-50: #f0fdfa;
   --color-kimo-100: #ccfbf1;
@@ -73,8 +74,11 @@ p {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* Brand primary is teal-700, not teal-500: white text on #14B8A6 is ~2.5:1 and fails
+     WCAG AA, white on #0F766E is ~5.5:1. teal-500 stays for focus rings and decoration. */
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --canvas: #f6f8f8;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -84,7 +88,7 @@ p {
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #14b8a6;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

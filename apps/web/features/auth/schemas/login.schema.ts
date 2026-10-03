@@ -1,7 +1,7 @@
 import * as yup from "yup"
 
 export const loginValidation = yup.object().shape({
-  country: yup.string().required("This field is required"),
+  country: yup.string().required("Select your country code"),
   number: yup
     .string()
     .required("This field is required")

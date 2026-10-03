@@ -1,20 +1,18 @@
 "use client";
 
 import { all } from "country-codes-list";
-import kimo from "@/public/images/kimo.png";
-import Image from "next/image";
-import Page from "@/components/layout/Page";
+import { LoaderCircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CountryCodeSelect } from "@/components/country-code-select";
-import { Input } from "@/components/ui/input";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { AuthShell } from "@/features/auth/components/auth-shell";
+import { FormAlert } from "@/features/auth/components/form-feedback";
+import { PhoneNumberField } from "@/features/auth/components/phone-number-field";
 import { useFormik } from "formik";
 import { loginValidation } from "@/features/auth/schemas/login.schema";
 import { useLoginMutation } from "@/features/auth/hooks/use-login-mutation";
 import { useRouter } from "next/navigation";
 import { useAppDispatch } from "@/lib/store/hooks";
 import { setUser, setBalance } from "@/features/auth/store/user-slice";
-import { useEffect } from "react";
+import { useEffect, useRef, type FormEvent } from "react";
 import { useAppSelector } from "@/lib/store/hooks";
 
 const countries = all();
@@ -24,6 +22,7 @@ const LoginPage = () => {
   const dispatch = useAppDispatch();
   const loginMutation = useLoginMutation();
   const userData = useAppSelector((state) => state.user);
+  const numberInputRef = useRef<HTMLInputElement>(null);
   // Set by the register page on a successful registration (redirecting
   // here, since Register no longer starts a session — see api-gateway's
   // Register handler) and, symmetrically, by this page itself below when
@@ -65,8 +64,10 @@ const LoginPage = () => {
     },
   });
 
-  const countryInvalid = formik.touched.country && !!formik.errors.country;
-  const numberInvalid = formik.touched.number && !!formik.errors.number;
+  const countryInvalid = !!formik.touched.country && !!formik.errors.country;
+  const numberInvalid = !!formik.touched.number && !!formik.errors.number;
+  const phoneInvalid = countryInvalid || numberInvalid;
+  const phoneError = (countryInvalid && formik.errors.country) || (numberInvalid && formik.errors.number) || "";
 
   useEffect(() => {
     if (userData.user?.id) {
@@ -74,68 +75,76 @@ const LoginPage = () => {
     }
   }, [userData.user?.id]);
 
+  // Formik's submit marks every field touched and validates; when that fails, move focus
+  // to the invalid field (docs/CLAUDE.md §5.3.6) so keyboard and screen-reader users land
+  // on the error instead of the button.
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    formik.handleSubmit(event);
+    const errors = await formik.validateForm();
+    if (errors.country || errors.number) {
+      numberInputRef.current?.focus();
+    }
+  }
+
   return (
-    <Page>
-      <form
-        className="bg-kimo-500 flex min-h-full w-full flex-col justify-between py-10 px-2 sm:px-0"
-        onSubmit={formik.handleSubmit}
-      >
-        <section className="flex flex-col w-full items-center justify-center gap-4">
-          <Image src={kimo} alt="kimo-logo" className="w-60 sm:w-80" />
+    <AuthShell onSubmit={handleSubmit}>
+      <h1 className="text-[22px] leading-7 font-semibold text-foreground">Enter your mobile number</h1>
+      <p className="mt-2 text-sm leading-5 text-muted-foreground">
+        Log in with the number linked to your Kimo account. New to Kimo? We&apos;ll help you sign up next.
+      </p>
 
-          <p className="text-lg font-medium text-white text-center">Enter your mobile number to continue</p>
+      <PhoneNumberField
+        id="login-number"
+        className="mt-8 gap-2"
+        inputRef={numberInputRef}
+        name="number"
+        value={formik.values.number}
+        onChange={formik.handleChange}
+        onBlur={formik.handleBlur}
+        country={formik.values.country}
+        onCountryChange={(code) => {
+          formik.setFieldValue("country", code);
+          formik.setFieldTouched("country", true);
+        }}
+        invalid={phoneInvalid}
+        error={phoneError}
+      />
 
-          <div className="flex w-full max-w-sm gap-2">
-            <Field data-invalid={countryInvalid} className={countryInvalid ? "w-56" : "w-30"}>
-              <FieldLabel className={countryInvalid ? "text-red-500" : undefined}>Country</FieldLabel>
-              <CountryCodeSelect
-                value={formik.values.country}
-                onChange={(code) => {
-                  formik.setFieldValue("country", code);
-                  formik.setFieldTouched("country", true);
-                }}
-              />
-              <FieldDescription>{countryInvalid && formik.errors.country}</FieldDescription>
-            </Field>
+      <p className="mt-3 text-sm text-muted-foreground">
+        Lost access to your number?{" "}
+        <button
+          type="button"
+          className="-my-3 inline-flex min-h-11 cursor-pointer items-center font-semibold text-primary underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+        >
+          Change number
+        </button>
+      </p>
 
-            <Field data-invalid={numberInvalid}>
-              <FieldLabel className={numberInvalid ? "text-red-500" : undefined}>Number</FieldLabel>
-              <Input
-                name="number"
-                value={formik.values.number}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                placeholder="812-3456-7890"
-                inputMode="numeric"
-                aria-invalid={numberInvalid}
-                className="bg-white"
-              />
-              <FieldDescription>{numberInvalid && formik.errors.number}</FieldDescription>
-            </Field>
-          </div>
+      {loginMutation.isError && loginMutation.error.message !== "user not found" && (
+        <FormAlert message={loginMutation.error.message} />
+      )}
 
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-white">Lost or inactive number?</p>
-            <Button className="rounded-2xl" size="sm">
-              Change number
-            </Button>
-          </div>
-
-          {loginMutation.isError && (
-            <p role="alert" className="text-sm text-red-200 text-center max-w-sm">
-              {loginMutation.error.message}
-            </p>
+      <div className="mt-8 flex flex-col gap-3">
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={loginMutation.isPending}
+          className="h-13 w-full rounded-xl text-base font-semibold"
+        >
+          {loginMutation.isPending ? (
+            <>
+              <LoaderCircleIcon className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
+              Checking your number…
+            </>
+          ) : (
+            "Continue"
           )}
-        </section>
-
-        <section className="flex flex-col gap-2 items-center justify-center">
-          <p className="text-white text-sm text-center">By continuing, you are agree with our T&C and Privacy Notice</p>
-          <Button className="sm:w-32 w-full" type="submit" disabled={loginMutation.isPending}>
-            {loginMutation.isPending ? "Please wait..." : "Continue"}
-          </Button>
-        </section>
-      </form>
-    </Page>
+        </Button>
+        <p className="text-center text-xs leading-5 text-muted-foreground">
+          By continuing, you agree to Kimo&apos;s Terms &amp; Conditions and Privacy Notice.
+        </p>
+      </div>
+    </AuthShell>
   );
 };
 
