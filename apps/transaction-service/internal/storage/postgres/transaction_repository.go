@@ -137,7 +137,23 @@ func (r *TransactionRepository) UpdateStatus(ctx context.Context, transactionID 
 	}
 
 	if result.RowsAffected == 0 {
-		return domain.ErrTransactionNotFound
+		// The guard above didn't match. Either this id doesn't exist (a real
+		// anomaly worth reporting — this service created every transaction
+		// it will ever be asked to update), or the row exists but is already
+		// terminal, which happens on every Kafka redelivery/out-of-order
+		// delivery of transaction.processed (docs/CLAUDE.md §3.6 rule 4).
+		// A terminal transaction is never re-processed (§3.5 rule 3), so
+		// that case must be a no-op, not an error the caller retries or
+		// dead-letters forever.
+		var current transactionModel
+		err := r.db.WithContext(ctx).Select("id").Where("id = ?", transactionID).First(&current).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domain.ErrTransactionNotFound
+			}
+			return fmt.Errorf("look up transaction after no-op status update: %w", err)
+		}
+		return nil
 	}
 
 	return nil

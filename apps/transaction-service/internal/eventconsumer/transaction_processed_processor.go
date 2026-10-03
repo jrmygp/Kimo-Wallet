@@ -11,6 +11,9 @@ import (
 	walletv1 "github.com/jrmygp/kimo-wallet/apps/transaction-service/gen/wallet/v1"
 )
 
+const statusCompleted = "COMPLETED"
+const statusFailed = "FAILED"
+
 type TransferProcessor interface {
 	UpdateTransactionStatus(ctx context.Context, transactionID string, status string, failureReason *string) error
 }
@@ -31,8 +34,8 @@ func (p *TransactionProcessedProcessor) Process(ctx context.Context, msg kafka.M
 	if event.GetTransactionId() == "" {
 		return errors.New("transaction.processed event missing transaction_id")
 	}
-	if event.GetStatus() == "" {
-		return errors.New("transaction.processed event missing status")
+	if event.GetStatus() != statusCompleted && event.GetStatus() != statusFailed {
+		return fmt.Errorf("transaction.processed event has invalid status: %s", event.GetStatus())
 	}
 
 	if err := p.transfer.UpdateTransactionStatus(ctx, event.GetTransactionId(), event.GetStatus(), event.FailureReason); err != nil {

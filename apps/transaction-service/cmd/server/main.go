@@ -96,9 +96,9 @@ func run(logger *slog.Logger) error {
 	transactionService := service.NewTransactionService(repo, walletClient)
 	transactionServer := grpcserver.NewTransactionServer(transactionService)
 
-	walletConsumer := kafkaconsumer.New(cfg.KafkaBrokers, cfg.KafkaConsumerGroup, transactionProcessedTopic)
+	transactionConsumer := kafkaconsumer.New(cfg.KafkaBrokers, cfg.KafkaConsumerGroup, transactionProcessedTopic)
 	defer func() {
-		if err := walletConsumer.Close(); err != nil {
+		if err := transactionConsumer.Close(); err != nil {
 			logger.Error("close kafka consumer", "error", err.Error())
 		}
 	}()
@@ -111,6 +111,11 @@ func run(logger *slog.Logger) error {
 	}()
 
 	producer := kafkaproducer.New(cfg.KafkaBrokers)
+	defer func() {
+		if err := producer.Close(); err != nil {
+			logger.Error("close kafka producer", "error", err.Error())
+		}
+	}()
 
 	outboxRepo := postgres.NewOutboxRepository(db)
 	relay := outbox.NewRelay(outboxRepo, producer, outboxRelayInterval, logger)
@@ -131,10 +136,10 @@ func run(logger *slog.Logger) error {
 		serveErr <- grpcServer.Serve(listener)
 	}()
 
-	walletHandler := eventconsumer.NewHandler(walletConsumer, eventconsumer.NewTransactionProcessedProcessor(transactionService), deadLetterProducer, logger)
+	transactionHandler := eventconsumer.NewHandler(transactionConsumer, eventconsumer.NewTransactionProcessedProcessor(transactionService), deadLetterProducer, logger)
 	go func() {
 		logger.Info("consuming", "topic", transactionProcessedTopic, "group", cfg.KafkaConsumerGroup)
-		walletHandler.Run(ctx)
+		transactionHandler.Run(ctx)
 	}()
 
 	select {
