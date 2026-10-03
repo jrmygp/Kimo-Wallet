@@ -69,6 +69,7 @@ export function CountryCodeSelect({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger
         disabled={disabled}
+        aria-label={selected ? `Country code: ${selected.countryNameEn} +${selected.countryCallingCode}` : placeholder}
         className={cn(
           "flex h-12 items-center gap-1.5 rounded-sm bg-background px-2.5 text-sm shadow-xs outline-none transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:border-input dark:bg-input/30",
           className,
@@ -93,8 +94,11 @@ export function CountryCodeSelect({
         <SheetHeader className="gap-3 border-b border-border pb-4">
           <div className="flex items-center justify-between">
             <SheetTitle>Select country code</SheetTitle>
-            <SheetClose>
-              <MdOutlineClose size={20} className="cursor-pointer"/>
+            <SheetClose
+              aria-label="Close"
+              className="-mr-2 flex size-11 cursor-pointer items-center justify-center rounded-full hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <MdOutlineClose size={20} aria-hidden />
             </SheetClose>
           </div>
 
