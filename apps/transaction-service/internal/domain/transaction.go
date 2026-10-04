@@ -11,23 +11,15 @@ import (
 )
 
 var (
-	ErrSenderNotFound   = errors.New("sender user not found")
-	ErrReceiverNotFound = errors.New("receiver user not found")
-	// ErrSenderWalletMismatch / ErrReceiverWalletMismatch: the user id
-	// exists and has a wallet, but not the specific wallet id the request
-	// named. Never conflated with ErrSender/ReceiverNotFound (§6:
-	// authorize every request against the resource owner) — a request
-	// naming someone else's real wallet id must be rejected just as hard
-	// as one naming a wallet id that doesn't exist at all.
-	ErrSenderWalletMismatch   = errors.New("sender wallet does not belong to sender user")
-	ErrReceiverWalletMismatch = errors.New("receiver wallet does not belong to receiver user")
-	ErrIdempotencyConflict    = errors.New("idempotency key conflict")
-	ErrTransactionNotFound    = errors.New("transaction not found")
-	ErrInvalidIdempotencyKey  = errors.New("idempotency key is required")
-	ErrInvalidID              = errors.New("id must be a valid uuid")
-	ErrSenderIsReceiver       = errors.New("sender and receiver must be different users")
-	ErrInvalidAmount          = errors.New("amount must be greater than zero")
-	ErrInvalidCurrency        = errors.New("currency is required")
+	ErrSenderNotFound        = errors.New("sender user not found")
+	ErrReceiverNotFound      = errors.New("receiver user not found")
+	ErrIdempotencyConflict   = errors.New("idempotency key conflict")
+	ErrTransactionNotFound   = errors.New("transaction not found")
+	ErrInvalidIdempotencyKey = errors.New("idempotency key is required")
+	ErrInvalidID             = errors.New("id must be a valid uuid")
+	ErrSenderIsReceiver      = errors.New("sender and receiver must be different users")
+	ErrInvalidAmount         = errors.New("amount must be greater than zero")
+	ErrInvalidCurrency       = errors.New("currency is required")
 )
 
 // idPattern matches a v4 UUID as produced by internal/idgen.NewV4 — the
@@ -50,8 +42,13 @@ type Transaction struct {
 }
 
 type TransactionRequest struct {
-	IdempotencyKey   string
-	SenderUserID     string
+	IdempotencyKey string
+	SenderUserID   string
+	// SenderWalletID / ReceiverWalletID are never supplied by a caller (the
+	// CreateTransaction contract has no such fields). NewTransactionRequest
+	// leaves them empty; TransactionService.CreateTransaction fills them from
+	// wallet-service's answer for each user id, so the stored transaction can
+	// only ever name the sender's and receiver's own wallets (§6).
 	SenderWalletID   string
 	ReceiverUserID   string
 	ReceiverWalletID string
@@ -67,14 +64,13 @@ type TransactionRequest struct {
 // whether the idempotency key has already been used (that's the
 // database's own unique constraint — see
 // storage/postgres's TransactionRepository.Create).
-func NewTransactionRequest(idempotencyKey, senderUserID, senderWalletID, receiverUserID, receiverWalletID, currency string, amount int64) (TransactionRequest, error) {
+func NewTransactionRequest(idempotencyKey, senderUserID, receiverUserID, currency string, amount int64) (TransactionRequest, error) {
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
 	if idempotencyKey == "" {
 		return TransactionRequest{}, ErrInvalidIdempotencyKey
 	}
 
-	if !idPattern.MatchString(senderUserID) || !idPattern.MatchString(senderWalletID) ||
-		!idPattern.MatchString(receiverUserID) || !idPattern.MatchString(receiverWalletID) {
+	if !idPattern.MatchString(senderUserID) || !idPattern.MatchString(receiverUserID) {
 		return TransactionRequest{}, ErrInvalidID
 	}
 
@@ -92,12 +88,10 @@ func NewTransactionRequest(idempotencyKey, senderUserID, senderWalletID, receive
 	}
 
 	return TransactionRequest{
-		IdempotencyKey:   idempotencyKey,
-		SenderUserID:     senderUserID,
-		SenderWalletID:   senderWalletID,
-		ReceiverUserID:   receiverUserID,
-		ReceiverWalletID: receiverWalletID,
-		Currency:         currency,
-		Amount:           amount,
+		IdempotencyKey: idempotencyKey,
+		SenderUserID:   senderUserID,
+		ReceiverUserID: receiverUserID,
+		Currency:       currency,
+		Amount:         amount,
 	}, nil
 }

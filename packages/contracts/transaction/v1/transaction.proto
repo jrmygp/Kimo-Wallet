@@ -20,11 +20,15 @@ message Transaction {
 }
 
 message CreateTransactionRequest {
+  // 3 and 5 were sender_wallet_id / receiver_wallet_id. Wallets are resolved by
+  // transaction-service from the user ids (via wallet-service), never taken from a
+  // caller, so a client can't name a wallet that isn't the sender's or receiver's own.
+  reserved 3, 5;
+  reserved "sender_wallet_id", "receiver_wallet_id";
+
   string idempotency_key = 1;
   string sender_user_id = 2;
-  string sender_wallet_id = 3;
   string receiver_user_id = 4;
-  string receiver_wallet_id = 5;
   int64 amount = 6;
   string currency = 7;
 }
