@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-10-10 — Entry 1 — [Add rate limiting to api-gateway (auth routes by IP, CreateTransaction by user)](2026-10-10.md) — apps/api-gateway — money:yes — completed
 - 2026-10-04 — Entry 3 — [Transfer page: amount schema, intent-scoped idempotency key + review step, result/offline states, schema tests](2026-10-04.md) — apps/web — money:yes — completed
 - 2026-10-04 — Entry 2 — [Fix the transfer response-shape mismatch in the web client](2026-10-04.md) — apps/web — money:yes — completed
 - 2026-10-04 — Entry 1 — [Resolve both wallets server-side; drop wallet ids (and the sender) from the CreateTransaction request](2026-10-04.md) — packages/contracts, apps/transaction-service, apps/api-gateway, apps/web — money:yes — completed
