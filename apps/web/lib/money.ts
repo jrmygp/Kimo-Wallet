@@ -19,3 +19,17 @@ export function formatAmount(amount: number): string {
 export function formatMoney(amount: number, currency: string): string {
   return `${currencySymbol(currency)} ${formatAmount(amount)}`;
 }
+
+const DIGITS_ONLY = /^\d+$/;
+
+/**
+ * The one place a typed amount becomes a number: whole rupiah, digits only
+ * (no separators, signs, decimals or exponents), safe-integer range. Returns
+ * null for anything else, so callers can't get a float or NaN out of it.
+ */
+export function parseAmountInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!DIGITS_ONLY.test(trimmed)) return null;
+  const amount = Number(trimmed);
+  return Number.isSafeInteger(amount) ? amount : null;
+}

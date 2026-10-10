@@ -5,6 +5,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jrmygp/kimo-wallet/apps/transaction-service/internal/domain"
@@ -38,9 +39,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, request doma
 	validated, err := domain.NewTransactionRequest(
 		request.IdempotencyKey,
 		request.SenderUserID,
-		request.SenderWalletID,
 		request.ReceiverUserID,
-		request.ReceiverWalletID,
 		request.Currency,
 		request.Amount,
 	)
@@ -49,35 +48,23 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, request doma
 	}
 	request = validated
 
-	// GetWalletByUserID returns an error (codes.NotFound) on a missing
-	// wallet — it never succeeds with a nil Wallet — so NotFound must be
-	// read off the error itself, not the response. The response is also
-	// checked against the client-supplied wallet id, not just discarded:
-	// confirming the *user* has *a* wallet is not the same as confirming
-	// the *specific wallet id in the request* is theirs (§6) — without
-	// this, an authenticated sender could still name someone else's real
-	// wallet id and have it debited.
-	senderWallet, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.SenderUserID})
+	// Both wallet ids come from wallet-service's answer for each user id —
+	// never from the caller — so the stored transaction (and the
+	// transaction.created event wallet-service settles from) can only name
+	// the sender's and receiver's own wallets (§6). GetWalletByUserID
+	// returns an error (codes.NotFound) on a missing wallet — it never
+	// succeeds with a nil Wallet — so NotFound must be read off the error
+	// itself, not the response.
+	senderWalletID, err := s.lookupWalletID(ctx, request.SenderUserID, domain.ErrSenderNotFound)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return domain.Transaction{}, domain.ErrSenderNotFound
-		}
 		return domain.Transaction{}, fmt.Errorf("sender wallet lookup: %w", err)
 	}
-	if senderWallet.GetWallet().GetId() != request.SenderWalletID {
-		return domain.Transaction{}, domain.ErrSenderWalletMismatch
-	}
-
-	receiverWallet, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: request.ReceiverUserID})
+	receiverWalletID, err := s.lookupWalletID(ctx, request.ReceiverUserID, domain.ErrReceiverNotFound)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return domain.Transaction{}, domain.ErrReceiverNotFound
-		}
 		return domain.Transaction{}, fmt.Errorf("receiver wallet lookup: %w", err)
 	}
-	if receiverWallet.GetWallet().GetId() != request.ReceiverWalletID {
-		return domain.Transaction{}, domain.ErrReceiverWalletMismatch
-	}
+	request.SenderWalletID = senderWalletID
+	request.ReceiverWalletID = receiverWalletID
 
 	id, err := idgen.NewV4()
 	if err != nil {
@@ -85,6 +72,25 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, request doma
 	}
 
 	return s.repo.Create(ctx, id, request)
+}
+
+// lookupWalletID returns userID's wallet id, notFound when wallet-service
+// reports codes.NotFound, or a wrapped error for anything else (including a
+// successful response with no wallet id, which would otherwise be persisted
+// as an empty wallet reference).
+func (s *TransactionService) lookupWalletID(ctx context.Context, userID string, notFound error) (string, error) {
+	resp, err := s.wallet.GetWalletByUserID(ctx, &walletv1.GetWalletByUserIDRequest{UserId: userID})
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return "", notFound
+		}
+		return "", err
+	}
+	walletID := resp.GetWallet().GetId()
+	if walletID == "" {
+		return "", errors.New("wallet-service returned a wallet with no id")
+	}
+	return walletID, nil
 }
 
 func (s *TransactionService) UpdateTransactionStatus(ctx context.Context, transactionID string, status string, failureReason *string) error {

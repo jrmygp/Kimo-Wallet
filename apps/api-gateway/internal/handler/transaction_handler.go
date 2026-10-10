@@ -25,27 +25,29 @@ func NewTransactionHandler(client transactionServiceClient, logger *slog.Logger)
 	return &TransactionHandler{client: client, logger: logger}
 }
 
+// createTransactionRequestBody deliberately has no sender and no wallet ids:
+// the sender is always the authenticated caller (taken from the JWT below),
+// and both wallets are resolved by transaction-service from the user ids.
+// A client that still sends senderUserId/senderWalletId/receiverWalletId has
+// them ignored by the JSON decoder, never trusted.
 type createTransactionRequestBody struct {
-	IdempotencyKey   string `json:"idempotencyKey"`
-	SenderUserID     string `json:"senderUserId"`
-	SenderWalletID   string `json:"senderWalletId"`
-	ReceiverUserID   string `json:"receiverUserId"`
-	ReceiverWalletID string `json:"receiverWalletId"`
-	Currency         string `json:"currency"`
-	Amount           int64  `json:"amount"`
+	IdempotencyKey string `json:"idempotencyKey"`
+	ReceiverUserID string `json:"receiverUserId"`
+	Currency       string `json:"currency"`
+	Amount         int64  `json:"amount"`
 }
 
+// createTransactionResponseBody omits wallet ids: the client never deals in
+// them, and the receiver's wallet id is no business of the sender's.
 type createTransactionResponseBody struct {
-	ID               string `json:"id"`
-	IdempotencyKey   string `json:"idempotencyKey"`
-	SenderUserID     string `json:"senderUserId"`
-	SenderWalletID   string `json:"senderWalletId"`
-	ReceiverUserID   string `json:"receiverUserId"`
-	ReceiverWalletID string `json:"receiverWalletId"`
-	Currency         string `json:"currency"`
-	Amount           int64  `json:"amount"`
-	Status           string `json:"status"`
-	CreatedAt        string `json:"createdAt"`
+	ID             string `json:"id"`
+	IdempotencyKey string `json:"idempotencyKey"`
+	SenderUserID   string `json:"senderUserId"`
+	ReceiverUserID string `json:"receiverUserId"`
+	Currency       string `json:"currency"`
+	Amount         int64  `json:"amount"`
+	Status         string `json:"status"`
+	CreatedAt      string `json:"createdAt"`
 }
 
 type transactionData struct {
@@ -54,16 +56,14 @@ type transactionData struct {
 
 func convertTransactionToResponseBody(t *transactionv1.Transaction) createTransactionResponseBody {
 	return createTransactionResponseBody{
-		ID:               t.Id,
-		IdempotencyKey:   t.IdempotencyKey,
-		SenderUserID:     t.SenderUserId,
-		SenderWalletID:   t.SenderWalletId,
-		ReceiverUserID:   t.ReceiverUserId,
-		ReceiverWalletID: t.ReceiverWalletId,
-		Currency:         t.Currency,
-		Amount:           t.Amount,
-		Status:           t.Status,
-		CreatedAt:        t.CreatedAt.AsTime().Format(time.RFC3339),
+		ID:             t.Id,
+		IdempotencyKey: t.IdempotencyKey,
+		SenderUserID:   t.SenderUserId,
+		ReceiverUserID: t.ReceiverUserId,
+		Currency:       t.Currency,
+		Amount:         t.Amount,
+		Status:         t.Status,
+		CreatedAt:      t.CreatedAt.AsTime().Format(time.RFC3339),
 	}
 }
 
@@ -76,13 +76,11 @@ func (h *TransactionHandler) CreateTransaction(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// The gateway holds no domain logic (docs/CLAUDE.md §4), but
-	// authorizing the request against the resource owner is not domain
-	// logic — it's the one thing only the gateway can do, since it's the
-	// only layer that sees the caller's own authenticated identity
-	// alongside the sender id the client put in the body. Without this,
-	// any authenticated user could move money out of any wallet just by
-	// putting someone else's id here (§6).
+	// The sender is the authenticated caller — taken from the JWT, never
+	// from the body. Identifying the caller is not domain logic (docs/CLAUDE.md
+	// §4); it's the one thing only the gateway can do, since it's the only
+	// layer that sees the verified token. Without this, any authenticated user
+	// could move money out of any wallet by naming someone else as sender (§6).
 	claims, ok := jwtauth.ClaimsFromContext(r.Context())
 	if !ok {
 		// RequireAuth always puts claims on the context before this
@@ -94,21 +92,13 @@ func (h *TransactionHandler) CreateTransaction(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusForbidden, "sender must be the authenticated user")
 		return
 	}
-	if claims.Subject != body.SenderUserID {
-		h.logger.Error("create transaction: sender does not match authenticated caller",
-			"authenticated_user_id", claims.Subject, "requested_sender_user_id", body.SenderUserID)
-		writeError(w, http.StatusForbidden, "sender must be the authenticated user")
-		return
-	}
 
 	resp, err := h.client.CreateTransaction(r.Context(), &transactionv1.CreateTransactionRequest{
-		IdempotencyKey:   body.IdempotencyKey,
-		SenderUserId:     body.SenderUserID,
-		SenderWalletId:   body.SenderWalletID,
-		ReceiverUserId:   body.ReceiverUserID,
-		ReceiverWalletId: body.ReceiverWalletID,
-		Currency:         body.Currency,
-		Amount:           body.Amount,
+		IdempotencyKey: body.IdempotencyKey,
+		SenderUserId:   claims.Subject,
+		ReceiverUserId: body.ReceiverUserID,
+		Currency:       body.Currency,
+		Amount:         body.Amount,
 	})
 	if err != nil {
 		writeGRPCError(w, err)

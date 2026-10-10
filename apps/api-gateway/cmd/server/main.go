@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -84,7 +85,27 @@ func run(logger *slog.Logger) error {
 	userHandler := handler.NewUserHandler(userClient, walletClient, logger)
 	transactionHandler := handler.NewTransactionHandler(transactionClient, logger)
 	tokenVerifier := jwtauth.NewVerifier(cfg.JWTSecret)
-	router := httpserver.NewRouter(userHandler, transactionHandler, middleware.RequireAuth(tokenVerifier))
+
+	// Auth attempts: 5 immediately, refilling at 5/min, per caller IP —
+	// generous enough for a real login retry, tight enough to blunt a
+	// credential-stuffing loop (docs/CLAUDE.md §6).
+	authRateLimiter := middleware.NewRateLimiter(rate.Every(12*time.Second), 5, 10*time.Minute)
+	defer authRateLimiter.Close()
+
+	// Financial mutations: 10 immediately, refilling at 10/min, per
+	// authenticated user — well above what a legitimate client (including
+	// its own idempotency-key retries) needs, but bounds a single user's
+	// transaction-creation attempts (docs/CLAUDE.md §6).
+	transactionRateLimiter := middleware.NewRateLimiter(rate.Every(6*time.Second), 10, 10*time.Minute)
+	defer transactionRateLimiter.Close()
+
+	router := httpserver.NewRouter(
+		userHandler,
+		transactionHandler,
+		middleware.RequireAuth(tokenVerifier),
+		authRateLimiter.Middleware(middleware.KeyByIP),
+		transactionRateLimiter.Middleware(middleware.KeyByAuthenticatedUser),
+	)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,

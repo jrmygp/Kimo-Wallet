@@ -42,13 +42,11 @@ func NewTransactionServer(service transactionService) *TransactionServer {
 
 func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transactionv1.CreateTransactionRequest) (*transactionv1.CreateTransactionResponse, error) {
 	transaction, err := s.service.CreateTransaction(ctx, domain.TransactionRequest{
-		IdempotencyKey:   req.IdempotencyKey,
-		SenderUserID:     req.SenderUserId,
-		SenderWalletID:   req.SenderWalletId,
-		ReceiverUserID:   req.ReceiverUserId,
-		ReceiverWalletID: req.ReceiverWalletId,
-		Currency:         req.Currency,
-		Amount:           req.Amount,
+		IdempotencyKey: req.IdempotencyKey,
+		SenderUserID:   req.SenderUserId,
+		ReceiverUserID: req.ReceiverUserId,
+		Currency:       req.Currency,
+		Amount:         req.Amount,
 	})
 	if err != nil {
 		switch {
@@ -56,9 +54,7 @@ func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transact
 			errors.Is(err, domain.ErrInvalidID),
 			errors.Is(err, domain.ErrSenderIsReceiver),
 			errors.Is(err, domain.ErrInvalidAmount),
-			errors.Is(err, domain.ErrInvalidCurrency),
-			errors.Is(err, domain.ErrSenderWalletMismatch),
-			errors.Is(err, domain.ErrReceiverWalletMismatch):
+			errors.Is(err, domain.ErrInvalidCurrency):
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		case errors.Is(err, domain.ErrSenderNotFound), errors.Is(err, domain.ErrReceiverNotFound):
 			return nil, status.Error(codes.NotFound, err.Error())
