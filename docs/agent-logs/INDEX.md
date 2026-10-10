@@ -18,6 +18,7 @@ Rules:
 
 ## Entries
 
+- 2026-10-10 — Entry 3 — [Refresh Redux's wallet balance after a transfer, instead of computing it client-side](2026-10-10.md) — apps/web — money:no — completed
 - 2026-10-10 — Entry 2 — [Block non-digit characters while typing the Amount field on the transfer page](2026-10-10.md) — apps/web — money:no — completed
 - 2026-10-10 — Entry 1 — [Add rate limiting to api-gateway (auth routes by IP, CreateTransaction by user)](2026-10-10.md) — apps/api-gateway — money:yes — completed
 - 2026-10-04 — Entry 3 — [Transfer page: amount schema, intent-scoped idempotency key + review step, result/offline states, schema tests](2026-10-04.md) — apps/web — money:yes — completed

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { HistoryIcon, PlusIcon, QrCodeIcon, SendIcon } from "lucide-react";
@@ -7,10 +8,12 @@ import image1 from "@/public/images/carousel1.jpeg";
 import image2 from "@/public/images/carousel2.jpeg";
 import image3 from "@/public/images/carousel3.jpeg";
 import { AppColumn } from "@/components/layout/app-column";
+import { setBalance } from "@/features/auth/store/user-slice";
 import { RecentTransactions } from "@/features/transaction/components/recent-transactions";
+import { useOwnBalanceQuery } from "@/features/wallet/hooks/use-own-balance-query";
 import { TransferRecipientSheet } from "@/features/wallet/components/transfer-recipient-sheet";
 import { WalletSummary } from "@/features/wallet/components/wallet-summary";
-import { useAppSelector } from "@/lib/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 
 const actionClassName =
   "relative flex min-h-[84px] flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-[13px] leading-4 font-medium text-foreground transition-colors focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:outline-none";
@@ -25,6 +28,16 @@ const promotions = [
 
 const HomePage = () => {
   const userData = useAppSelector((state) => state.user);
+  const dispatch = useAppDispatch();
+
+  // Safety net, not the primary update path: a successful transfer already
+  // refreshes the balance itself (see the transfer page). This just makes
+  // sure the number is still fresh for anyone landing on /home without
+  // having just transferred (e.g. after being paid by someone else).
+  const { data: ownBalance } = useOwnBalanceQuery(userData.user?.kimoId);
+  useEffect(() => {
+    if (ownBalance !== undefined) dispatch(setBalance(ownBalance));
+  }, [ownBalance, dispatch]);
 
   return (
     <AppColumn className="pb-[max(2rem,env(safe-area-inset-bottom))]">

@@ -15,9 +15,11 @@ import { useTransferMutation } from "@/features/transaction/hooks/use-transfer-m
 import { createTransferFormSchema, type TransferFormValues } from "@/features/transaction/schemas/transfer-form.schema";
 import type { TransferTransaction } from "@/features/transaction/schemas/transfer.schema";
 import { intentFor, type TransferIntent } from "@/features/transaction/transfer-intent";
+import { setBalance } from "@/features/auth/store/user-slice";
+import { fetchOwnBalance } from "@/features/wallet/api/get-own-balance";
 import type { WalletUser } from "@/features/wallet/schemas/user.schema";
 import { useSearchUserQuery } from "@/features/wallet/hooks/use-search-user-query";
-import { useAppSelector } from "@/lib/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/lib/store/hooks";
 import { currencySymbol, formatMoney, parseAmountInput } from "@/lib/money";
 import { useOnlineStatus } from "@/lib/use-online-status";
 import { getInitials } from "@/lib/utils";
@@ -47,8 +49,9 @@ const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
   const { userId } = use(params);
   const { data: recipient, isFetching, isError, error } = useSearchUserQuery(userId);
   const balance = useAppSelector((state) => state.user.balance);
+  const ownKimoId = useAppSelector((state) => state.user.user?.kimoId);
+  const dispatch = useAppDispatch();
   const online = useOnlineStatus();
-  console.log(online)
   const transferMutation = useTransferMutation();
 
   const [step, setStep] = useState<Step>({ name: "form" });
@@ -98,6 +101,19 @@ const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
           lastIntentRef.current = null;
           formik.resetForm();
           setStep({ name: "submitted", transaction });
+
+          // The sender's balance just changed server-side (debited once
+          // wallet-service settles), but redux's cached copy doesn't know
+          // that — refresh it from the server rather than computing a new
+          // number here (docs/CLAUDE.md §3.7.4: never a client-side
+          // computation). Best-effort: a failure here just leaves the
+          // balance stale until the next refresh (e.g. revisiting /home),
+          // not something to surface to the user mid-"submitted" screen.
+          if (ownKimoId) {
+            fetchOwnBalance(ownKimoId)
+              .then((wallet) => dispatch(setBalance(wallet)))
+              .catch((err) => console.error("refresh balance after transfer", err));
+          }
         },
         onError: (err) => {
           if (err instanceof TransferError && err.kind === "duplicate") {

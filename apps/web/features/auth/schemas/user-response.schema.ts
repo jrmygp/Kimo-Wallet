@@ -1,4 +1,5 @@
 import * as yup from "yup";
+import { walletSchema } from "@/features/wallet/schemas/wallet.schema";
 
 const userSchema = yup
   .object({
@@ -19,19 +20,7 @@ const userSchema = yup
 // register's shape is deliberately different.
 export const userResponseSchema = yup.object({
   user: userSchema,
-  // Wallet enrichment is always best-effort (apps/api-gateway's
-  // fetchWallet never fails the request) — a brand new user can
-  // legitimately have no wallet yet (async Kafka provisioning), so this
-  // must be nullable, not just optional: the backend sends a literal
-  // JSON `null`, which plain .object() rejects without .nullable().
-  wallet: yup
-    .object({
-      balance: yup.number().required(),
-      currency: yup.string().required(),
-      status: yup.string().required(),
-    })
-    .nullable()
-    .defined(),
+  wallet: walletSchema,
   accessToken: yup.string().required(),
 });
 
