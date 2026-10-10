@@ -27,6 +27,7 @@ func toProtoTransaction(transaction domain.Transaction) *transactionv1.Transacti
 		Amount:           transaction.Amount,
 		Currency:         transaction.Currency,
 		Status:           transaction.Status,
+		Note:             transaction.Note,
 		CreatedAt:        timestamppb.New(transaction.CreatedAt),
 	}
 }
@@ -47,6 +48,7 @@ func (s *TransactionServer) CreateTransaction(ctx context.Context, req *transact
 		ReceiverUserID: req.ReceiverUserId,
 		Currency:       req.Currency,
 		Amount:         req.Amount,
+		Note:           &req.Note,
 	})
 	if err != nil {
 		switch {

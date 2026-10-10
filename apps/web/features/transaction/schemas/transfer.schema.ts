@@ -5,6 +5,7 @@ export const transferSchema = yup.object().shape({
   receiverUserId: yup.string().required(),
   currency: yup.string().required(),
   amount: yup.number().required(),
+  note: yup.string().notRequired()
 });
 
 export type TransferRequestData = yup.InferType<typeof transferSchema>;
@@ -19,6 +20,7 @@ export const transferTransactionSchema = yup.object({
   currency: yup.string().required(),
   amount: yup.number().integer().required(),
   status: yup.string().required(),
+  note: yup.string().nullable().required(),
   createdAt: yup.string().required(),
 });
 

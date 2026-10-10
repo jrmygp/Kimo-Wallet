@@ -31,10 +31,11 @@ func NewTransactionHandler(client transactionServiceClient, logger *slog.Logger)
 // A client that still sends senderUserId/senderWalletId/receiverWalletId has
 // them ignored by the JSON decoder, never trusted.
 type createTransactionRequestBody struct {
-	IdempotencyKey string `json:"idempotencyKey"`
-	ReceiverUserID string `json:"receiverUserId"`
-	Currency       string `json:"currency"`
-	Amount         int64  `json:"amount"`
+	IdempotencyKey string  `json:"idempotencyKey"`
+	ReceiverUserID string  `json:"receiverUserId"`
+	Currency       string  `json:"currency"`
+	Amount         int64   `json:"amount"`
+	Note           *string `json:"note"`
 }
 
 // createTransactionResponseBody omits wallet ids: the client never deals in
@@ -47,6 +48,7 @@ type createTransactionResponseBody struct {
 	Currency       string `json:"currency"`
 	Amount         int64  `json:"amount"`
 	Status         string `json:"status"`
+	Note           string `json:"note"`
 	CreatedAt      string `json:"createdAt"`
 }
 
@@ -63,6 +65,7 @@ func convertTransactionToResponseBody(t *transactionv1.Transaction) createTransa
 		Currency:       t.Currency,
 		Amount:         t.Amount,
 		Status:         t.Status,
+		Note:           t.GetNote(),
 		CreatedAt:      t.CreatedAt.AsTime().Format(time.RFC3339),
 	}
 }
@@ -93,12 +96,21 @@ func (h *TransactionHandler) CreateTransaction(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// body.Note is nil whenever the client omits it — that's the whole
+	// point of it being optional, so it's converted to the request's plain
+	// (always-present) string field rather than dereferenced directly.
+	var note string
+	if body.Note != nil {
+		note = *body.Note
+	}
+
 	resp, err := h.client.CreateTransaction(r.Context(), &transactionv1.CreateTransactionRequest{
 		IdempotencyKey: body.IdempotencyKey,
 		SenderUserId:   claims.Subject,
 		ReceiverUserId: body.ReceiverUserID,
 		Currency:       body.Currency,
 		Amount:         body.Amount,
+		Note:           note,
 	})
 	if err != nil {
 		writeGRPCError(w, err)

@@ -36,6 +36,7 @@ type Transaction struct {
 	Currency         string
 	Amount           int64
 	Status           string
+	Note             *string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	CompletedAt      *time.Time
@@ -54,6 +55,7 @@ type TransactionRequest struct {
 	ReceiverWalletID string
 	Currency         string
 	Amount           int64
+	Note             *string
 }
 
 // NewTransactionRequest validates raw request fields and returns a
@@ -64,7 +66,7 @@ type TransactionRequest struct {
 // whether the idempotency key has already been used (that's the
 // database's own unique constraint — see
 // storage/postgres's TransactionRepository.Create).
-func NewTransactionRequest(idempotencyKey, senderUserID, receiverUserID, currency string, amount int64) (TransactionRequest, error) {
+func NewTransactionRequest(idempotencyKey, senderUserID, receiverUserID, currency string, amount int64, note *string) (TransactionRequest, error) {
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
 	if idempotencyKey == "" {
 		return TransactionRequest{}, ErrInvalidIdempotencyKey
@@ -93,5 +95,6 @@ func NewTransactionRequest(idempotencyKey, senderUserID, receiverUserID, currenc
 		ReceiverUserID: receiverUserID,
 		Currency:       currency,
 		Amount:         amount,
+		Note:           note,
 	}, nil
 }

@@ -35,6 +35,7 @@ type transactionModel struct {
 	Amount           int64
 	Status           string
 	FailureReason    *string
+	Note             *string
 	CreatedAt        time.Time // populated by GORM on Create via its CreatedAt convention
 	UpdatedAt        time.Time
 	CompletedAt      *time.Time
@@ -63,6 +64,7 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 		Currency:         request.Currency,
 		Amount:           request.Amount,
 		Status:           statusPending,
+		Note:             request.Note,
 	}
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -109,6 +111,7 @@ func (r *TransactionRepository) Create(ctx context.Context, id string, request d
 			Currency:         row.Currency,
 			Amount:           row.Amount,
 			Status:           row.Status,
+			Note:             row.Note,
 			CreatedAt:        row.CreatedAt,
 			UpdatedAt:        row.UpdatedAt,
 			CompletedAt:      row.CompletedAt,

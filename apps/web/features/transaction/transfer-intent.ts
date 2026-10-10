@@ -9,6 +9,7 @@ export interface TransferIntent {
   receiverUserId: string;
   amount: number;
   currency: string;
+  note?: string;
 }
 
 /**

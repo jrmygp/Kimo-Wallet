@@ -17,6 +17,7 @@ message Transaction {
   string currency = 8;
   string status = 9;
   google.protobuf.Timestamp created_at = 10;
+  optional string note = 11;
 }
 
 message CreateTransactionRequest {
@@ -31,6 +32,7 @@ message CreateTransactionRequest {
   string receiver_user_id = 4;
   int64 amount = 6;
   string currency = 7;
+  string note = 8;
 }
 
 message CreateTransactionResponse {

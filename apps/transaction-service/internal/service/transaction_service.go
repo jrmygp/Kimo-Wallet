@@ -42,6 +42,7 @@ func (s *TransactionService) CreateTransaction(ctx context.Context, request doma
 		request.ReceiverUserID,
 		request.Currency,
 		request.Amount,
+		request.Note,
 	)
 	if err != nil {
 		return domain.Transaction{}, err

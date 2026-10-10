@@ -41,13 +41,14 @@ type Step =
   | { name: "duplicate" };
 
 const OFFLINE_MESSAGE =
-  "You're offline. You can view cached information, but payments and transfers require an internet connection.";
+  "You're offline. Please check your connection and try again.";
 
 const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
   const { userId } = use(params);
   const { data: recipient, isFetching, isError, error } = useSearchUserQuery(userId);
   const balance = useAppSelector((state) => state.user.balance);
   const online = useOnlineStatus();
+  console.log(online)
   const transferMutation = useTransferMutation();
 
   const [step, setStep] = useState<Step>({ name: "form" });
@@ -66,7 +67,7 @@ const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
       if (!recipient || amount === null) return;
       const intent = intentFor(
         lastIntentRef.current,
-        { receiverUserId: recipient.id, amount, currency },
+        { receiverUserId: recipient.id, amount, currency, note: values.note },
         () => crypto.randomUUID(),
       );
       lastIntentRef.current = intent;
@@ -90,6 +91,7 @@ const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
         receiverUserId: intent.receiverUserId,
         currency: intent.currency,
         amount: intent.amount,
+        note: intent.note
       },
       {
         onSuccess: (transaction) => {
@@ -115,6 +117,14 @@ const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
         },
       },
     );
+  }
+
+  // Strip anything but digits as the user types/pastes, instead of letting a
+  // bad character in and only flagging it on blur/submit — the Yup schema
+  // (transfer-form.schema.ts) still re-validates on top of this, since this
+  // is UX only, never the authority (docs/CLAUDE.md §5.3.5).
+  function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    formik.setFieldValue("amount", e.target.value.replace(/\D/g, ""));
   }
 
   const amountInvalid = !!formik.touched.amount && !!formik.errors.amount;
@@ -167,7 +177,7 @@ const TransferPage = ({ params }: { params: Promise<{ userId: string }> }) => {
                     id="amount"
                     name="amount"
                     value={formik.values.amount}
-                    onChange={formik.handleChange}
+                    onChange={handleAmountChange}
                     onBlur={formik.handleBlur}
                     placeholder="0"
                     inputMode="numeric"
